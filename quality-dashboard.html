@@ -97,7 +97,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 /* ── Charts ── */
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1.25rem;margin-bottom:1.25rem}
-.chart-card{background:#fff;border-radius:1rem;padding:1.125rem;border:1px solid #e2e8f0;overflow:hidden}
+.chart-card{background:#fff;border-radius:1rem;padding:1.125rem;border:1px solid #e2e8f0;overflow:visible}
 .chart-card.wide{grid-column:1/-1}
 .chart-subtitle{font-size:.85rem;font-weight:700;color:#475569;margin-bottom:.875rem;display:flex;align-items:center;gap:.4rem}
 .donut-layout{display:grid;grid-template-columns:1fr 1.7fr;gap:1rem;align-items:center}
@@ -298,8 +298,8 @@ const fmt = v => Number(v).toLocaleString('zh-TW');
 const fmtPct = v => r1(v).toFixed(1)+'%';
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const unique = arr => [...new Set(arr.filter(Boolean))];
-const sortDesc = arr => [...arr].sort((a,b)=>String(b).localeCompare(String(a)));
-const sortAsc = arr => [...arr].sort((a,b)=>String(a).localeCompare(String(b)));
+const sortDesc = arr => [...arr].sort((a,b)=>String(b).localeCompare(String(a),'zh-TW',{numeric:true}));
+const sortAsc = arr => [...arr].sort((a,b)=>String(a).localeCompare(String(b),'zh-TW',{numeric:true}));
 
 function getBrandCol(cols) {
   return BRAND_COLS.find(c=>cols.includes(c)) || cols[0];
@@ -362,6 +362,7 @@ class MultiSelect {
       </div>`;
 
     this.el.querySelector(`#${this.id}-tr`).addEventListener('click', e => { e.stopPropagation(); this._toggle(); });
+    this.el.querySelector(`#${this.id}-dp`).addEventListener('click', e => e.stopPropagation());
     this.el.querySelector(`#${this.id}-q`).addEventListener('input', e => { this.q=e.target.value; this._renderList(); });
     this.el.querySelector(`#${this.id}-all`).addEventListener('click', e => { e.stopPropagation(); this.options.forEach(o=>this.selected.add(o)); this._renderList(); this._renderTrigger(); this.onChange(this.getSelected()); });
     this.el.querySelector(`#${this.id}-clr`).addEventListener('click', e => { e.stopPropagation(); this.selected.clear(); this._renderList(); this._renderTrigger(); this.onChange(this.getSelected()); });
@@ -754,6 +755,10 @@ function onFilterChange(tabId, level) {
   const df = st.processed.filter(r=>r['期間']===st.curPeriod);
 
   if (level==='vendor') {
+    // Update vendor options
+    const vendorOpts = sortAsc(unique(df.filter(r=>r['廠商']).map(r=>String(r['廠商']||''))));
+    MS[`${tabId}-vendor`]?.setOptions(vendorOpts, true);
+    st.filters.vendors = MS[`${tabId}-vendor`]?.getSelected()||[];
     // Update brand options
     const vFiltered = st.filters.vendors.length ? df.filter(r=>st.filters.vendors.includes(String(r['廠商']||''))) : df;
     const brandOpts = sortAsc(unique(vFiltered.map(r=>String(r[st.brandCol]||''))));
@@ -854,6 +859,27 @@ function renderCharts(tabId) {
 
   container.innerHTML = '';
 
+  // Show/hide trend metric selector
+  const tmRow = document.getElementById(`${tabId}-trend-metric-row`);
+  const showTrendAny = (shown.has('月趨勢') && st.trendRaw.length>0) || (shown.has('廠商趨勢比較') && st.hasVendor);
+  if (tmRow) tmRow.style.display = showTrendAny ? 'flex' : 'none';
+
+  if (shown.has('廠商趨勢比較') && st.hasVendor) {
+    const card = document.createElement('div');
+    card.className = 'chart-card wide';
+    card.innerHTML = `<div class="chart-subtitle">📈 廠商趨勢比較</div><div id="${tabId}-vendor-trend"></div>`;
+    container.appendChild(card);
+    setTimeout(()=>plotVendorTrend(`${tabId}-vendor-trend`, st, cfg), 0);
+  }
+
+  if (shown.has('月趨勢') && st.trendRaw.length>0) {
+    const card = document.createElement('div');
+    card.className = 'chart-card wide';
+    card.innerHTML = `<div class="chart-subtitle">📅 月趨勢</div><div id="${tabId}-month-trend"></div>`;
+    container.appendChild(card);
+    setTimeout(()=>plotMonthTrend(`${tabId}-month-trend`, st, cfg), 0);
+  }
+
   const showOnline = shown.has('上線量品質占比');
   const showReturn = shown.has('派工回廠品質占比');
   if (showOnline || showReturn) {
@@ -902,27 +928,6 @@ function renderCharts(tabId) {
     },0);
   }
 
-  // Show/hide trend metric selector
-  const tmRow = document.getElementById(`${tabId}-trend-metric-row`);
-  const showTrendAny = (shown.has('月趨勢') && st.trendRaw.length>0) || (shown.has('廠商趨勢比較') && st.hasVendor);
-  if (tmRow) tmRow.style.display = showTrendAny ? 'flex' : 'none';
-
-  if (shown.has('廠商趨勢比較') && st.hasVendor) {
-    const card = document.createElement('div');
-    card.className = 'chart-card wide';
-    card.innerHTML = `<div class="chart-subtitle">📈 廠商趨勢比較</div><div id="${tabId}-vendor-trend"></div>`;
-    container.appendChild(card);
-    setTimeout(()=>plotVendorTrend(`${tabId}-vendor-trend`, st, cfg), 0);
-  }
-
-  if (shown.has('月趨勢') && st.trendRaw.length>0) {
-    const card = document.createElement('div');
-    card.className = 'chart-card wide';
-    card.innerHTML = `<div class="chart-subtitle">📅 月趨勢</div><div id="${tabId}-month-trend"></div>`;
-    container.appendChild(card);
-    setTimeout(()=>plotMonthTrend(`${tabId}-month-trend`, st, cfg), 0);
-  }
-
   // Lens env analysis
   if (tabId==='lens') renderLensEnv(st);
 }
@@ -942,7 +947,7 @@ function buildDonutCard(tabId, type, kc, name) {
         <table class="donut-tbl" id="${tblId}"></table>
         <p class="donut-cap" id="${capId}"></p>
       </div>
-      <div id="${chartId}" style="min-height:260px"></div>
+      <div id="${chartId}" style="min-height:260px;width:100%;min-width:0"></div>
     </div>`;
 
   setTimeout(() => {
@@ -1398,7 +1403,10 @@ function switchTab(tabId) {
     document.getElementById(`tab-btn-${t}`).classList.toggle('active', t===tabId);
   });
   // Trigger resize to fix Plotly charts
-  setTimeout(()=>window.dispatchEvent(new Event('resize')),50);
+  setTimeout(()=>{
+    window.dispatchEvent(new Event('resize'));
+    document.querySelectorAll('.js-plotly-plot').forEach(el=>Plotly.Plots.resize(el));
+  }, 200);
 }
 
 function switchRecTab(tabId, type, btn) {

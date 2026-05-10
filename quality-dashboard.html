@@ -1311,10 +1311,11 @@ function renderTable(tabId) {
       let display;
       if (c===groupCol) {
         if (type==='total') display='★ 總計';
-        else if (type==='subtotal') display=esc(v||'')+'<small style="color:#64748b;font-weight:400;margin-left:.4rem">小計</small>';
         else display=esc(v||'');
       } else if ((c==='ERP品號'||c==='品名')&&type!=='detail') {
         display='';
+      } else if (c==='已使用年限'&&type!=='detail') {
+        display = v!=null&&v!==''&&!isNaN(v) ? r1(toN(v)).toFixed(1) : '';
       } else if (numCols.includes(c)) {
         display=fmt(Math.round(toN(v)));
       } else if (pctCols.includes(c)) {
@@ -1340,6 +1341,8 @@ function buildSubFor(rows, groupCol, label, numCols) {
   sub['過保率(%)']    = r1(safeDiv(sub['過保數']||0,ret)*100);
   sub['整體不良率(%)'] = r1(safeDiv(sub['不良品數']||0,on)*100);
   sub['整體過保率(%)'] = r1(safeDiv(sub['過保數']||0,on)*100);
+  const ageVals = rows.map(r=>toN(r['已使用年限'])).filter(v=>v>0);
+  sub['已使用年限'] = ageVals.length ? ageVals.reduce((s,v)=>s+v,0)/ageVals.length : '';
   return sub;
 }
 

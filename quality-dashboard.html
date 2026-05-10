@@ -1061,7 +1061,8 @@ function plotVendorTrend(elId, st, cfg) {
   const dfAll = st.processed;
   if (!dfAll.some(r=>r[metric]!=null)) { el.innerHTML=`<div class="alert alert-info">廠商資料中找不到「${metric}」欄位</div>`; return; }
 
-  let data = dfAll;
+  const selectedPeriods = [...new Set([st.curPeriod, st.prvPeriod].filter(Boolean))];
+  let data = dfAll.filter(r=>selectedPeriods.includes(String(r['期間']||'')));
   if (st.filters.vendors.length) data=data.filter(r=>st.filters.vendors.includes(String(r['廠商']||'')));
   if (st.filters.brands.length)  data=data.filter(r=>st.filters.brands.includes(String(r[st.brandCol]||'')));
 
@@ -1094,7 +1095,7 @@ function plotMonthTrend(elId, st, cfg) {
   const el = document.getElementById(elId);
   if (!el) return;
   const metric = st.trendMetric;
-  const trendPeriods = [st.curPeriod, st.prvPeriod].filter(Boolean);
+  const trendPeriods = [...new Set([st.curPeriod, st.prvPeriod].filter(Boolean))];
   let dt = st.trendRaw.filter(r=>trendPeriods.includes(String(r['期間']||'')));
 
   if (!dt.length) { el.innerHTML='<div class="alert alert-info">月趨勢工作表中無對應期間資料</div>'; return; }

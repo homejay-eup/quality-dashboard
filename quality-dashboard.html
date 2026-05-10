@@ -828,7 +828,7 @@ function renderKpis(tabId) {
       const dStr = isNum ? sign+fmt(Math.round(diff)) : sign+r1(diff).toFixed(1)+'%';
       const worse = worseHigh.has(d.key) ? diff>0 : diff<0;
       const cls = diff===0?'neu': (worse?'neg':'pos');
-      deltaHtml = `<span class="kpi-delta ${cls}">${dStr} vs ${st.prvPeriod}</span>`;
+      deltaHtml = `<span class="kpi-delta ${cls}">${dStr}</span>`;
     }
     return `<div class="kpi-card">
       <div class="kpi-label">${esc(d.key)}</div>

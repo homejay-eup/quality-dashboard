@@ -97,7 +97,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 /* ── Charts ── */
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1.25rem;margin-bottom:1.25rem}
-.chart-card{background:#fff;border-radius:1rem;padding:1.125rem;border:1px solid #e2e8f0;overflow:visible}
+.chart-card{background:#fff;border-radius:1rem;padding:1.125rem;border:1px solid #e2e8f0;overflow:hidden}
 .chart-card.wide{grid-column:1/-1}
 .chart-subtitle{font-size:.85rem;font-weight:700;color:#475569;margin-bottom:.875rem;display:flex;align-items:center;gap:.4rem}
 .donut-layout{display:grid;grid-template-columns:1fr 1.7fr;gap:1rem;align-items:center}
@@ -165,12 +165,14 @@ tr.tot:hover td{background:#1e3a5f}
 ::-webkit-scrollbar-thumb:hover{background:#94a3b8}
 
 /* ── Responsive ── */
+@media(max-width:900px){
+  .donut-layout{grid-template-columns:1fr}
+  .pie-pair{grid-template-columns:1fr}
+}
 @media(max-width:768px){
   .tab-content{padding:1rem}
   .chart-grid{grid-template-columns:1fr}
   .kpi-grid{grid-template-columns:repeat(2,1fr)}
-  .donut-layout{grid-template-columns:1fr}
-  .pie-pair{grid-template-columns:1fr}
   .pf-row .fg{min-width:100%}
 }
 
@@ -975,7 +977,7 @@ function plotOnlineDonut(chartId, tblId, capId, kc, name) {
   const labels = items.map(i=>i.l);
   const values = items.map(i=>i.v);
   const colors = items.map(i=>ONLINE_MAP[i.l]||COLORS.grey);
-  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?`${i.l}<br>${r1(p).toFixed(1)}%`:p>=1?`${r1(p).toFixed(1)}%`:''; });
+  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?r1(p).toFixed(1)+'%':''; });
 
   const el = document.getElementById(chartId);
   if (!el) return;
@@ -985,8 +987,9 @@ function plotOnlineDonut(chartId, tblId, capId, kc, name) {
     textposition:'inside', insidetextorientation:'horizontal',
     hoverinfo:'label+value+percent', textfont:{size:11},
   }], {
-    height:280, margin:{t:10,b:10,l:10,r:10},
-    showlegend:true, legend:{orientation:'h',y:-0.05,x:0.5,xanchor:'center',font:{size:10}},
+    height:300, margin:{t:10,b:60,l:10,r:10},
+    autosize:true,
+    showlegend:true, legend:{orientation:'h',y:-0.12,x:0.5,xanchor:'center',font:{size:10}},
     annotations:[{text:`上線<br>${fmt(kc.total_on)}`,showarrow:false,font:{size:11},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
   }, {responsive:true, displayModeBar:false});
 }
@@ -1005,7 +1008,7 @@ function plotReturnDonut(chartId, tblId, capId, kc, name) {
   const labels = items.map(i=>i.l);
   const values = items.map(i=>i.v);
   const colors = items.map(i=>RETURN_MAP[i.l]||COLORS.grey);
-  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?`${i.l}<br>${r1(p).toFixed(1)}%`:p>=1?`${r1(p).toFixed(1)}%`:''; });
+  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?r1(p).toFixed(1)+'%':''; });
 
   const el = document.getElementById(chartId);
   if (!el) return;
@@ -1015,8 +1018,9 @@ function plotReturnDonut(chartId, tblId, capId, kc, name) {
     textposition:'inside', insidetextorientation:'horizontal',
     hoverinfo:'label+value+percent', textfont:{size:11},
   }], {
-    height:280, margin:{t:10,b:10,l:10,r:10},
-    showlegend:true, legend:{orientation:'h',y:-0.05,x:0.5,xanchor:'center',font:{size:10}},
+    height:300, margin:{t:10,b:60,l:10,r:10},
+    autosize:true,
+    showlegend:true, legend:{orientation:'h',y:-0.12,x:0.5,xanchor:'center',font:{size:10}},
     annotations:[{text:`回廠<br>${fmt(kc.total_ret)}`,showarrow:false,font:{size:11},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
   }, {responsive:true, displayModeBar:false});
 }
@@ -1027,13 +1031,21 @@ function plotPie(elId, rows, faultCols, title) {
   const avail = faultCols.filter(c=>rows.some(r=>toN(r[c])>0));
   if (!avail.length || !rows.length) { el.innerHTML='<div style="color:#94a3b8;font-size:.85rem;padding:1rem;text-align:center">無資料</div>'; return; }
   const totals = avail.map(c=>({l:c,v:rows.reduce((s,r)=>s+toN(r[c]),0)})).filter(i=>i.v>0);
+  const total = totals.reduce((s,i)=>s+i.v,0)||1;
   Plotly.newPlot(el, [{
     type:'pie', hole:0.45,
     values:totals.map(i=>i.v), labels:totals.map(i=>i.l),
     marker:{colors:PIE_COLORS},
-    textinfo:'percent+label', textposition:'outside',
-  }], {title:{text:title,font:{size:13}},height:320,margin:{t:50,b:30,l:10,r:10},showlegend:false},
-  {responsive:true,displayModeBar:false});
+    text:totals.map(i=>{ const p=i.v/total*100; return p>=5?r1(p).toFixed(1)+'%':''; }),
+    textinfo:'text', textposition:'inside', insidetextorientation:'horizontal',
+    hoverinfo:'label+value+percent', textfont:{size:11},
+  }], {
+    title:{text:title,font:{size:13}},
+    height:360, margin:{t:50,b:80,l:10,r:10},
+    autosize:true,
+    showlegend:true,
+    legend:{orientation:'h',y:-0.18,x:0.5,xanchor:'center',font:{size:10}},
+  }, {responsive:true, displayModeBar:false});
 }
 
 function plotDisposal(elId, kpi, title) {
@@ -1045,13 +1057,21 @@ function plotDisposal(elId, kpi, title) {
     {l:'過保/報廢',v:kpi.total_scrap},
   ].filter(i=>i.v>0);
   if (!items.length) { el.innerHTML='<div style="color:#94a3b8;font-size:.85rem;padding:1rem;text-align:center">無資料</div>'; return; }
+  const dTotal = items.reduce((s,i)=>s+i.v,0)||1;
   Plotly.newPlot(el, [{
     type:'pie', hole:0.45,
     values:items.map(i=>i.v), labels:items.map(i=>i.l),
     marker:{colors:items.map(i=>DISPOSAL_MAP[i.l])},
-    textinfo:'percent+label', textposition:'outside',
-  }], {title:{text:title,font:{size:13}},height:320,margin:{t:50,b:30,l:10,r:10},showlegend:false},
-  {responsive:true,displayModeBar:false});
+    text:items.map(i=>{ const p=i.v/dTotal*100; return p>=5?r1(p).toFixed(1)+'%':''; }),
+    textinfo:'text', textposition:'inside', insidetextorientation:'horizontal',
+    hoverinfo:'label+value+percent', textfont:{size:11},
+  }], {
+    title:{text:title,font:{size:13}},
+    height:360, margin:{t:50,b:80,l:10,r:10},
+    autosize:true,
+    showlegend:true,
+    legend:{orientation:'h',y:-0.18,x:0.5,xanchor:'center',font:{size:10}},
+  }, {responsive:true, displayModeBar:false});
 }
 
 function plotVendorTrend(elId, st, cfg) {
@@ -1084,9 +1104,10 @@ function plotVendorTrend(elId, st, cfg) {
   }));
 
   Plotly.newPlot(el, traces, {
-    height:380, margin:{t:20,b:50,l:60,r:20},
+    height:380, margin:{t:20,b:80,l:60,r:20},
+    autosize:true,
     xaxis:{title:'期間'}, yaxis:{title:metric},
-    legend:{orientation:'h',y:-0.2,x:0.5,xanchor:'center'},
+    legend:{orientation:'h',y:-0.25,x:0.5,xanchor:'center'},
     plot_bgcolor:'#fff', paper_bgcolor:'#fff',
   }, {responsive:true,displayModeBar:false});
 }
@@ -1123,9 +1144,10 @@ function plotMonthTrend(elId, st, cfg) {
   });
 
   Plotly.newPlot(el, traces, {
-    height:340, margin:{t:20,b:50,l:60,r:20},
+    height:340, margin:{t:20,b:70,l:60,r:20},
+    autosize:true,
     xaxis:{title:'月份'}, yaxis:{title:metric},
-    legend:{orientation:'h',y:-0.25,x:0.5,xanchor:'center'},
+    legend:{orientation:'h',y:-0.28,x:0.5,xanchor:'center'},
     plot_bgcolor:'#fff', paper_bgcolor:'#fff',
   }, {responsive:true,displayModeBar:false});
 }
@@ -1173,9 +1195,9 @@ function renderLensEnvCharts(metric, df) {
     {y:outdoor, name:'室外',type:'box',boxpoints:'all',marker:{color:'#ed7d31'},line:{color:'#ed7d31'}},
   ], {
     title:{text:`鏡頭｜${metric} 分布（室內 vs 室外）`,font:{size:13}},
-    height:340,margin:{t:50,b:50,l:60,r:20},
-    yaxis:{title:metric},showlegend:true,
-    plot_bgcolor:'#fff',paper_bgcolor:'#fff',
+    height:340, margin:{t:50,b:60,l:60,r:20},
+    autosize:true, yaxis:{title:metric}, showlegend:true,
+    plot_bgcolor:'#fff', paper_bgcolor:'#fff',
   },{responsive:true,displayModeBar:false});
 
   // Bar chart: age group breakdown if 已使用年限 available
@@ -1190,9 +1212,9 @@ function renderLensEnvCharts(metric, df) {
     });
     Plotly.newPlot(barEl, traces, {
       title:{text:'鏡頭｜各年限區間回廠量（室內 vs 室外）',font:{size:13}},
-      barmode:'group',height:340,margin:{t:50,b:50,l:60,r:20},
-      yaxis:{title:'回廠量'},showlegend:true,
-      plot_bgcolor:'#fff',paper_bgcolor:'#fff',
+      barmode:'group', height:340, margin:{t:50,b:60,l:60,r:20},
+      autosize:true, yaxis:{title:'回廠量'}, showlegend:true,
+      plot_bgcolor:'#fff', paper_bgcolor:'#fff',
     },{responsive:true,displayModeBar:false});
   } else {
     barEl.innerHTML = '';

@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>設備品質分析</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh}
+
+/* ── Upload ── */
+#upload-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e40af 100%);padding:2rem}
+.up-card{background:#fff;border-radius:1.5rem;padding:3rem 3.5rem;max-width:520px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,.35)}
+.up-card h1{font-size:1.75rem;font-weight:800;color:#1e293b;margin-bottom:.4rem}
+.up-card p{color:#64748b;margin-bottom:2rem;line-height:1.7;font-size:.95rem}
+.up-icon{font-size:3.5rem;margin-bottom:1.25rem}
+.up-area{border:2.5px dashed #cbd5e1;border-radius:1rem;padding:2rem 1.5rem;cursor:pointer;transition:all .2s;background:#f8fafc}
+.up-area:hover,.up-area.drag-over{border-color:#2563eb;background:#eff6ff}
+.up-area input{display:none}
+.up-btn{display:inline-block;background:#2563eb;color:#fff;padding:.875rem 2rem;border-radius:.75rem;font-size:1rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:1rem;letter-spacing:.01em}
+.up-btn:hover{background:#1d4ed8}
+.up-hint{font-size:.82rem;color:#94a3b8;margin-top:1rem;line-height:1.5}
+
+/* ── App Shell ── */
+#dashboard{display:none;min-height:100vh}
+.app-header{background:#0f172a;color:#fff;padding:0 1.75rem;height:58px;display:flex;align-items:center;gap:.875rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.app-header h1{font-size:1rem;font-weight:700;white-space:nowrap}
+.header-file{font-size:.78rem;color:#64748b;margin-left:.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px}
+.change-btn{margin-left:auto;background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:.35rem .9rem;border-radius:.5rem;cursor:pointer;font-size:.8rem;transition:all .2s;white-space:nowrap}
+.change-btn:hover{background:#334155;color:#fff}
+
+/* ── Tab Nav ── */
+.tab-nav{background:#fff;border-bottom:1px solid #e2e8f0;display:flex;padding:0 1.75rem;position:sticky;top:58px;z-index:99}
+.tab-btn{padding:.9rem 1.5rem;font-size:.95rem;font-weight:600;color:#64748b;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s}
+.tab-btn.active{color:#2563eb;border-bottom-color:#2563eb}
+.tab-btn:hover:not(.active){color:#1e293b;background:#f8fafc}
+
+/* ── Content ── */
+.tab-content{padding:1.5rem 2rem;max-width:1600px;margin:0 auto}
+
+/* ── Cards ── */
+.card{background:#fff;border-radius:1rem;padding:1.25rem;border:1px solid #e2e8f0}
+.card-title{font-size:1rem;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}
+
+/* ── Period & Filter Row ── */
+.period-filter-wrap{background:#fff;border-radius:1rem;padding:1.25rem;border:1px solid #e2e8f0;margin-bottom:1.25rem}
+.pf-row{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:.35rem;min-width:160px;flex:1}
+.fg label{font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+.fg select{padding:.6rem .875rem;border:1.5px solid #e2e8f0;border-radius:.625rem;font-size:.875rem;background:#fff;cursor:pointer;color:#1e293b;transition:border-color .2s}
+.fg select:focus{outline:none;border-color:#2563eb}
+.filter-sep{width:100%;height:1px;background:#f1f5f9;margin:.25rem 0}
+.filter-row{display:flex;flex-wrap:wrap;gap:1rem}
+.filter-row .fg{min-width:180px}
+
+/* ── MultiSelect ── */
+.ms-wrap{position:relative}
+.ms-trigger{display:flex;align-items:center;justify-content:space-between;padding:.6rem .875rem;border:1.5px solid #e2e8f0;border-radius:.625rem;cursor:pointer;background:#fff;min-height:38px;transition:border-color .2s;user-select:none;gap:.5rem}
+.ms-trigger:hover{border-color:#94a3b8}
+.ms-trigger.open{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.ms-val{font-size:.875rem;color:#1e293b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-val.ph{color:#94a3b8}
+.ms-badge{background:#2563eb;color:#fff;border-radius:9999px;font-size:.68rem;font-weight:700;min-width:1.25rem;height:1.25rem;padding:0 .3rem;display:inline-flex;align-items:center;justify-content:center}
+.ms-arrow{color:#94a3b8;font-size:.7rem;transition:transform .2s;flex-shrink:0}
+.ms-trigger.open .ms-arrow{transform:rotate(180deg)}
+.ms-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid #e2e8f0;border-radius:.625rem;box-shadow:0 10px 25px rgba(0,0,0,.1);z-index:300;overflow:hidden}
+.ms-srch{padding:.5rem;border-bottom:1px solid #f1f5f9}
+.ms-srch input{width:100%;padding:.35rem .625rem;border:1px solid #e2e8f0;border-radius:.375rem;font-size:.82rem}
+.ms-srch input:focus{outline:none;border-color:#2563eb}
+.ms-list{max-height:200px;overflow-y:auto}
+.ms-opt{display:flex;align-items:center;gap:.5rem;padding:.45rem .75rem;cursor:pointer;font-size:.85rem;transition:background .1s}
+.ms-opt:hover{background:#f8fafc}
+.ms-opt input[type=checkbox]{accent-color:#2563eb;flex-shrink:0}
+.ms-empty{padding:.75rem;font-size:.82rem;color:#94a3b8;text-align:center}
+.ms-acts{display:flex;gap:.5rem;padding:.5rem;border-top:1px solid #f1f5f9;background:#f8fafc}
+.ms-acts button{flex:1;padding:.325rem;border:1px solid #e2e8f0;border-radius:.375rem;background:#fff;font-size:.78rem;cursor:pointer;transition:background .1s;color:#475569}
+.ms-acts button:hover{background:#f1f5f9}
+
+/* ── KPI Cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.kpi-card{background:#fff;border-radius:.875rem;padding:1.125rem;border:1px solid #e2e8f0;transition:box-shadow .2s}
+.kpi-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.kpi-label{font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem}
+.kpi-val{font-size:1.75rem;font-weight:800;color:#1e293b;line-height:1;margin-bottom:.35rem}
+.kpi-delta{font-size:.82rem;font-weight:600}
+.kpi-delta.pos{color:#16a34a}.kpi-delta.neg{color:#dc2626}.kpi-delta.neu{color:#94a3b8}
+
+/* ── Display Options ── */
+.opts-bar{background:#fff;border-radius:1rem;padding:1rem 1.25rem;border:1px solid #e2e8f0;margin-bottom:1.25rem}
+.opts-label{font-size:.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.625rem}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.chip{display:inline-flex;align-items:center;gap:.35rem;padding:.325rem .75rem;border:1.5px solid #e2e8f0;border-radius:9999px;font-size:.78rem;cursor:pointer;transition:all .2s;background:#fff;color:#64748b;user-select:none}
+.chip.on{background:#eff6ff;border-color:#2563eb;color:#2563eb;font-weight:700}
+.chip-dot{width:.5rem;height:.5rem;border-radius:50%;background:currentColor}
+
+/* ── Charts ── */
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1.25rem;margin-bottom:1.25rem}
+.chart-card{background:#fff;border-radius:1rem;padding:1.125rem;border:1px solid #e2e8f0;overflow:hidden}
+.chart-card.wide{grid-column:1/-1}
+.chart-subtitle{font-size:.85rem;font-weight:700;color:#475569;margin-bottom:.875rem;display:flex;align-items:center;gap:.4rem}
+.donut-layout{display:grid;grid-template-columns:1fr 1.7fr;gap:1rem;align-items:center}
+.donut-tbl{width:100%;font-size:.82rem;border-collapse:collapse}
+.donut-tbl td{padding:.25rem .4rem;color:#475569}
+.donut-tbl td:last-child{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:#1e293b}
+.donut-cap{font-size:.75rem;color:#94a3b8;margin-top:.625rem;line-height:1.5}
+.pie-pair{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.trend-metric-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap}
+.trend-metric-row label{font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.trend-metric-row select{padding:.4rem .75rem;border:1.5px solid #e2e8f0;border-radius:.5rem;font-size:.85rem;background:#fff;cursor:pointer}
+.trend-metric-row select:focus{outline:none;border-color:#2563eb}
+
+/* ── Table ── */
+.table-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;flex-wrap:wrap;gap:.75rem}
+.table-ctrls{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.toggle-lbl{display:flex;align-items:center;gap:.4rem;font-size:.85rem;color:#64748b;cursor:pointer}
+.toggle-lbl input{accent-color:#2563eb}
+.tbl-wrap{overflow-x:auto;border-radius:.75rem;border:1px solid #e2e8f0;background:#fff;max-height:600px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead{background:#f8fafc;position:sticky;top:0;z-index:1}
+th{padding:.65rem .875rem;text-align:right;font-weight:700;color:#475569;font-size:.75rem;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+th.l{text-align:left}
+td{padding:.55rem .875rem;text-align:right;color:#1e293b;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+td.l{text-align:left}
+tbody tr:hover{background:#f8fafc}
+tr.sub td{background:#dbeafe;font-weight:700}
+tr.sub:hover td{background:#bfdbfe}
+tr.tot td{background:#1e3a5f;color:#fff;font-weight:800}
+tr.tot:hover td{background:#1e3a5f}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:.375rem;padding:.575rem 1.125rem;border-radius:.625rem;font-size:.85rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
+.btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}
+.btn-outline{background:#fff;color:#2563eb;border:1.5px solid #2563eb}.btn-outline:hover{background:#eff6ff}
+.btn-ghost{background:transparent;color:#64748b;border:1.5px solid #e2e8f0}.btn-ghost:hover{background:#f1f5f9}
+.btn-sm{padding:.35rem .75rem;font-size:.78rem}
+
+/* ── Recommendations ── */
+.rec-tabs{display:flex;gap:.5rem;margin-bottom:.875rem}
+.rec-tab{padding:.45rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:600;border:none;cursor:pointer;background:#f1f5f9;color:#64748b;transition:all .2s}
+.rec-tab.active{background:#2563eb;color:#fff}
+.rec-panel{display:none}.rec-panel.active{display:block}
+.rec-textarea{width:100%;padding:1rem;border:1.5px solid #e2e8f0;border-radius:.75rem;font-size:.85rem;line-height:1.75;resize:vertical;font-family:inherit;color:#1e293b;min-height:260px}
+.rec-textarea:focus{outline:none;border-color:#2563eb}
+.rec-acts{display:flex;gap:.75rem;margin-top:.75rem;align-items:center;flex-wrap:wrap}
+
+/* ── Alert ── */
+.alert{padding:.875rem 1.125rem;border-radius:.625rem;font-size:.85rem;margin-bottom:1rem;line-height:1.6}
+.alert-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
+.alert-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+
+/* ── Section headers ── */
+.sec-title{font-size:1.05rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}
+
+/* ── Loading ── */
+#loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);align-items:center;justify-content:center;z-index:999}
+.spinner{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}
+::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .tab-content{padding:1rem}
+  .chart-grid{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .donut-layout{grid-template-columns:1fr}
+  .pie-pair{grid-template-columns:1fr}
+  .pf-row .fg{min-width:100%}
+}
+
+.sep{height:1px;background:#e2e8f0;margin:1.5rem 0}
+.env-row{display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap}
+.tag{display:inline-block;padding:.2rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:700}
+.tag-indoor{background:#dbeafe;color:#1d4ed8}.tag-outdoor{background:#fed7aa;color:#9a3412}
+</style>
+</head>
+<body>
+
+<!-- ════════ Upload Zone ════════ -->
+<div id="upload-zone">
+  <div class="up-card">
+    <div class="up-icon">📊</div>
+    <h1>設備品質分析</h1>
+    <p>上傳多期合併版分析總表<br>必要工作表：車機_彙整總覽、鏡頭_彙整總覽</p>
+    <div class="up-area" id="drop-area">
+      <input type="file" id="file-input" accept=".xlsx">
+      <div style="color:#94a3b8;font-size:1.5rem;margin-bottom:.5rem">📂</div>
+      <div style="font-size:.9rem;color:#475569;margin-bottom:.25rem">拖曳 Excel 檔案至此</div>
+      <div style="font-size:.8rem;color:#94a3b8">或</div>
+      <label class="up-btn" for="file-input">選擇檔案</label>
+    </div>
+    <p class="up-hint">支援 .xlsx 格式 ｜ 所有運算在您的瀏覽器完成，檔案不會上傳至伺服器</p>
+  </div>
+</div>
+
+<!-- ════════ Dashboard ════════ -->
+<div id="dashboard">
+  <header class="app-header">
+    <span style="font-size:1.25rem">📊</span>
+    <h1>設備品質分析</h1>
+    <span class="header-file" id="header-filename"></span>
+    <button class="change-btn" onclick="resetApp()">↩ 更換檔案</button>
+  </header>
+  <div class="tab-nav">
+    <button class="tab-btn active" id="tab-btn-car" onclick="switchTab('car')">🚗 車機分析</button>
+    <button class="tab-btn" id="tab-btn-lens" onclick="switchTab('lens')">📷 鏡頭分析</button>
+  </div>
+  <div id="tab-car" class="tab-content"></div>
+  <div id="tab-lens" class="tab-content" style="display:none"></div>
+</div>
+
+<div id="loading" style="display:flex">
+  <div style="text-align:center">
+    <div class="spinner" style="margin:0 auto 1rem"></div>
+    <div style="color:#64748b;font-size:.9rem">讀取資料中…</div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════
+const CFG = {
+  car: {
+    sheetName: '車機_彙整總覽',
+    trendSheet: '車機_月趨勢',
+    faultCols: ['AB點','失聯','定位不良','訊號異常','其他'],
+    name: '車機',
+    id: 'car',
+  },
+  lens: {
+    sheetName: '鏡頭_彙整總覽',
+    trendSheet: '鏡頭_月趨勢',
+    faultCols: ['黑畫面','進水/模糊','水波紋','時有時無','其他'],
+    name: '鏡頭',
+    id: 'lens',
+  },
+};
+
+const BRAND_COLS = ['廠牌型號','廠牌','類型'];
+const COLORS = {
+  navy:'#1f4e79', blue:'#4472c4', lb:'#7ba7d3',
+  llb:'#a9c4e4', lllb:'#d6e4f0',
+  red:'#e74c3c', orange:'#ed7d31', green:'#27ae60', grey:'#95a5a6',
+};
+
+// Chart color palettes
+const PIE_COLORS = [COLORS.navy,COLORS.blue,COLORS.lb,COLORS.llb,COLORS.lllb];
+const ONLINE_MAP = {'仍在線數':COLORS.navy,'良品數':COLORS.blue,'過保數':COLORS.lb,'不良品數':COLORS.llb,'人為數':COLORS.lllb};
+const RETURN_MAP = {'良品數':COLORS.navy,'過保數':COLORS.blue,'不良品數':COLORS.lb,'人為數':COLORS.lllb};
+const DISPOSAL_MAP = {'良品（再使用）':'#4472c4','不良品（維修/換貨）':'#e74c3c','過保/報廢':'#95a5a6'};
+
+// ════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════
+const appState = {
+  sheets: {},
+  car: makeTabState(),
+  lens: makeTabState(),
+};
+const MS = {}; // multiselect instances
+
+function makeTabState() {
+  return {
+    rawData: [],
+    processed: [],
+    trendRaw: [],
+    periods: [],
+    curPeriod: null,
+    prvPeriod: null,
+    brandCol: null,
+    hasVendor: false,
+    hasErp: false,
+    filters: { vendors:[], brands:[], erps:[] },
+    collapse: false,
+    trendMetric: '回廠量',
+    displayKpis: new Set(['總上線量','期間回廠量','期間再使用率','整體不良率','整體過保率']),
+    displayCharts: new Set(['上線量品質占比','派工回廠品質占比','回廠原因分佈','處置結果分佈','月趨勢','廠商趨勢比較']),
+    curFiltered: [],
+    prvFiltered: [],
+    kpiC: null,
+    kpiP: null,
+  };
+}
+
+// ════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════
+const toN = v => { if(v==null||v==='') return 0; const n=Number(v); return isNaN(n)?0:n; };
+const r1 = v => Math.round(v*10)/10;
+const fmt = v => Number(v).toLocaleString('zh-TW');
+const fmtPct = v => r1(v).toFixed(1)+'%';
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const unique = arr => [...new Set(arr.filter(Boolean))];
+const sortDesc = arr => [...arr].sort((a,b)=>String(b).localeCompare(String(a)));
+const sortAsc = arr => [...arr].sort((a,b)=>String(a).localeCompare(String(b)));
+
+function getBrandCol(cols) {
+  return BRAND_COLS.find(c=>cols.includes(c)) || cols[0];
+}
+
+function getLabel(row) {
+  const erp = row['ERP品號'] ? String(row['ERP品號']).trim() : '';
+  const nm = row['品名'] ? String(row['品名']).trim() : '';
+  if (erp && nm) return `${erp} - ${nm}`;
+  if (erp) return erp;
+  return nm;
+}
+
+function groupBy(arr, fn) {
+  const m = new Map();
+  arr.forEach(r => {
+    const k = fn(r);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(r);
+  });
+  return m;
+}
+
+function sumCol(rows, col) {
+  return rows.reduce((s,r)=>s+toN(r[col]),0);
+}
+
+function safeDiv(n, d) {
+  return d ? n/d : 0;
+}
+
+// ════════════════════════════════════════════════════════
+// MULTI-SELECT
+// ════════════════════════════════════════════════════════
+class MultiSelect {
+  constructor(id, onChange) {
+    this.id = id;
+    this.onChange = onChange;
+    this.options = [];
+    this.selected = new Set();
+    this.q = '';
+    this.el = document.getElementById(id);
+    if (!this.el) return;
+    this._build();
+  }
+
+  _build() {
+    this.el.innerHTML = `
+      <div class="ms-trigger" id="${this.id}-tr">
+        <span class="ms-val ph" id="${this.id}-v">全部</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-drop" id="${this.id}-dp" style="display:none">
+        <div class="ms-srch"><input type="text" placeholder="搜尋…" id="${this.id}-q"></div>
+        <div class="ms-list" id="${this.id}-lst"></div>
+        <div class="ms-acts">
+          <button id="${this.id}-all">全選</button>
+          <button id="${this.id}-clr">清除</button>
+        </div>
+      </div>`;
+
+    this.el.querySelector(`#${this.id}-tr`).addEventListener('click', e => { e.stopPropagation(); this._toggle(); });
+    this.el.querySelector(`#${this.id}-q`).addEventListener('input', e => { this.q=e.target.value; this._renderList(); });
+    this.el.querySelector(`#${this.id}-all`).addEventListener('click', e => { e.stopPropagation(); this.options.forEach(o=>this.selected.add(o)); this._renderList(); this._renderTrigger(); this.onChange(this.getSelected()); });
+    this.el.querySelector(`#${this.id}-clr`).addEventListener('click', e => { e.stopPropagation(); this.selected.clear(); this._renderList(); this._renderTrigger(); this.onChange(this.getSelected()); });
+  }
+
+  _toggle() {
+    const dp = this.el.querySelector(`#${this.id}-dp`);
+    const tr = this.el.querySelector(`#${this.id}-tr`);
+    const open = dp.style.display !== 'none';
+    // close others
+    Object.values(MS).forEach(ms => { if(ms.id!==this.id) ms.close(); });
+    if (open) { this.close(); }
+    else { dp.style.display='block'; tr.classList.add('open'); }
+  }
+
+  close() {
+    const dp = this.el.querySelector(`#${this.id}-dp`);
+    const tr = this.el.querySelector(`#${this.id}-tr`);
+    if(dp) dp.style.display='none';
+    if(tr) tr.classList.remove('open');
+  }
+
+  _renderList() {
+    const lst = this.el.querySelector(`#${this.id}-lst`);
+    if (!lst) return;
+    const q = this.q.toLowerCase();
+    const filtered = this.options.filter(o => !q || o.toLowerCase().includes(q));
+    if (filtered.length === 0) {
+      lst.innerHTML = '<div class="ms-empty">無符合選項</div>'; return;
+    }
+    lst.innerHTML = filtered.map((o,i) => `
+      <label class="ms-opt">
+        <input type="checkbox" data-val="${esc(o)}" ${this.selected.has(o)?'checked':''}>
+        <span>${esc(o)}</span>
+      </label>`).join('');
+    lst.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const val = cb.dataset.val;
+        if(cb.checked) this.selected.add(val); else this.selected.delete(val);
+        this._renderTrigger();
+        this.onChange(this.getSelected());
+      });
+    });
+  }
+
+  _renderTrigger() {
+    const vEl = this.el.querySelector(`#${this.id}-v`);
+    if (!vEl) return;
+    const sel = [...this.selected];
+    if (sel.length === 0) { vEl.textContent='全部'; vEl.className='ms-val ph'; }
+    else if (sel.length === 1) { vEl.textContent=sel[0]; vEl.className='ms-val'; }
+    else { vEl.innerHTML=`已選 <span class="ms-badge">${sel.length}</span>`; vEl.className='ms-val'; }
+  }
+
+  setOptions(opts, keepValid=false) {
+    this.options = [...opts];
+    if (keepValid) {
+      // Keep only selected values that are still valid
+      this.selected = new Set([...this.selected].filter(s=>this.options.includes(s)));
+    } else {
+      this.selected.clear();
+    }
+    this.q = '';
+    const qEl = this.el.querySelector(`#${this.id}-q`);
+    if(qEl) qEl.value='';
+    this._renderList();
+    this._renderTrigger();
+  }
+
+  getSelected() { return [...this.selected]; }
+}
+
+document.addEventListener('click', () => Object.values(MS).forEach(ms=>ms.close()));
+
+// ════════════════════════════════════════════════════════
+// DATA LOADING
+// ════════════════════════════════════════════════════════
+async function handleFile(file) {
+  showLoading(true);
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array', cellDates:false });
+    const sheets = {};
+    wb.SheetNames.forEach(n => {
+      sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval:'' });
+    });
+    appState.sheets = sheets;
+    document.getElementById('header-filename').textContent = file.name;
+
+    ['car','lens'].forEach(tabId => {
+      const cfg = CFG[tabId];
+      const raw = sheets[cfg.sheetName] || [];
+      const trend = sheets[cfg.trendSheet] || [];
+      appState[tabId].rawData = raw;
+      appState[tabId].trendRaw = trend;
+      if (raw.length > 0) {
+        appState[tabId].processed = processDF(raw, cfg.faultCols);
+        const cols = Object.keys(appState[tabId].processed[0] || {});
+        appState[tabId].brandCol = getBrandCol(cols);
+        appState[tabId].hasVendor = cols.includes('廠商');
+        appState[tabId].hasErp = cols.includes('ERP品號');
+        initPeriods(tabId);
+      }
+    });
+
+    document.getElementById('upload-zone').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+
+    buildTabUI('car');
+    buildTabUI('lens');
+    renderAll('car');
+  } catch(e) {
+    alert('讀取檔案失敗：'+e.message);
+    console.error(e);
+  }
+  showLoading(false);
+}
+
+function initPeriods(tabId) {
+  const st = appState[tabId];
+  const periods = sortDesc(unique(st.processed.map(r=>String(r['期間']||''))));
+  st.periods = periods;
+  st.curPeriod = periods[0] || null;
+  st.prvPeriod = periods[1] || null;
+}
+
+// ════════════════════════════════════════════════════════
+// DATA PROCESSING
+// ════════════════════════════════════════════════════════
+function processDF(rows, faultCols) {
+  if (!rows || rows.length===0) return [];
+  const cols = Object.keys(rows[0]);
+
+  const goodSrc = ['回廠良品數','良品數'].find(c=>cols.includes(c));
+  const badSrc  = ['回廠不良品數','不良品數'].find(c=>cols.includes(c));
+  const scrSrc  = ['回廠過保數','過保數'].find(c=>cols.includes(c));
+
+  return rows.map(r => {
+    const row = Object.assign({}, r);
+    if (!String(row['期間']||'').trim()) row['期間']='未知期間';
+
+    // 良品數
+    if (goodSrc) { row['良品數'] = toN(row[goodSrc]); }
+    else { row['良品數'] = ['O /測試正常','回廠QC','回廠其他'].filter(c=>cols.includes(c)).reduce((s,c)=>s+toN(r[c]),0); }
+
+    // 不良品數
+    if (badSrc) { row['不良品數'] = toN(row[badSrc]); }
+    else { row['不良品數'] = ['G /評估後退修','X /已完修','維修換貨＋換貨條碼'].filter(c=>cols.includes(c)).reduce((s,c)=>s+toN(r[c]),0); }
+
+    // 過保數
+    if (scrSrc) { row['過保數'] = toN(row[scrSrc]); }
+    else { row['過保數'] = ['D /停產報廢','E /過保報廢','回廠報廢'].filter(c=>cols.includes(c)).reduce((s,c)=>s+toN(r[c]),0); }
+
+    // 回廠量
+    if (!cols.includes('回廠量')) {
+      row['回廠量'] = faultCols.filter(c=>cols.includes(c)).reduce((s,c)=>s+toN(r[c]),0);
+    } else { row['回廠量'] = toN(row['回廠量']); }
+
+    // 人為數
+    const humSrc = ['人為數','人為'].find(c=>cols.includes(c));
+    row['人為數'] = humSrc ? toN(row[humSrc]) : 0;
+
+    const ret = row['回廠量'];
+    const on = toN(row['上線量']);
+    row['上線量'] = on;
+    row['再使用率(%)']  = r1(safeDiv(row['良品數'],ret)*100);
+    row['不良率(%)']   = r1(safeDiv(row['不良品數'],ret)*100);
+    row['過保率(%)']   = r1(safeDiv(row['過保數'],ret)*100);
+    row['整體不良率(%)'] = r1(safeDiv(row['不良品數'],on)*100);
+    row['整體過保率(%)'] = r1(safeDiv(row['過保數'],on)*100);
+    row['仍在線數'] = Math.max(0, on - ret);
+    return row;
+  });
+}
+
+function calcKpi(rows) {
+  if (!rows || rows.length===0) return null;
+  const on  = sumCol(rows,'上線量');
+  const ret = sumCol(rows,'回廠量');
+  const bad = sumCol(rows,'不良品數');
+  const good= sumCol(rows,'良品數');
+  const scr = sumCol(rows,'過保數');
+  const hum = sumCol(rows,'人為數');
+  return {
+    total_on:Math.round(on), total_ret:Math.round(ret),
+    total_bad:Math.round(bad), total_good:Math.round(good),
+    total_scrap:Math.round(scr), total_human:Math.round(hum),
+    reuse_rate: safeDiv(good,ret)*100,
+    bad_rate:   safeDiv(bad,ret)*100,
+    scrap_rate: safeDiv(scr,ret)*100,
+    ovr_bad_rate: safeDiv(bad,on)*100,
+    ovr_scr_rate: safeDiv(scr,on)*100,
+  };
+}
+
+function filterRows(rows, st) {
+  let r = rows;
+  if (st.filters.vendors.length) r=r.filter(x=>st.filters.vendors.includes(String(x['廠商']||'')));
+  if (st.filters.brands.length)  r=r.filter(x=>st.filters.brands.includes(String(x[st.brandCol]||'')));
+  if (st.filters.erps.length)    r=r.filter(x=>st.filters.erps.includes(getLabel(x)));
+  return r;
+}
+
+// ════════════════════════════════════════════════════════
+// BUILD TAB UI (called once after file load)
+// ════════════════════════════════════════════════════════
+function buildTabUI(tabId) {
+  const cfg = CFG[tabId];
+  const st  = appState[tabId];
+  const el  = document.getElementById(`tab-${tabId}`);
+  if (!el) return;
+
+  if (st.processed.length === 0) {
+    el.innerHTML = `<div class="alert alert-warn">找不到工作表「${cfg.sheetName}」，請確認 Excel 欄位正確。</div>`;
+    return;
+  }
+
+  const hasVendor = st.hasVendor;
+  const hasErp    = st.hasErp;
+  const hasTrend  = st.trendRaw.length > 0;
+
+  el.innerHTML = `
+    <!-- Period & Filters -->
+    <div class="period-filter-wrap">
+      <div class="pf-row">
+        <div class="fg">
+          <label>目前期間</label>
+          <select id="${tabId}-cur"></select>
+        </div>
+        <div class="fg">
+          <label>對比期間</label>
+          <select id="${tabId}-prv"></select>
+        </div>
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-row">
+        ${hasVendor?`<div class="fg"><label>廠商篩選</label><div class="ms-wrap" id="ms-${tabId}-vendor"></div></div>`:''}
+        <div class="fg"><label>類型篩選</label><div class="ms-wrap" id="ms-${tabId}-brand"></div></div>
+        ${hasErp?`<div class="fg"><label>ERP品號篩選</label><div class="ms-wrap" id="ms-${tabId}-erp"></div></div>`:''}
+      </div>
+    </div>
+
+    <!-- KPI Display Options -->
+    <div class="opts-bar" id="${tabId}-kpi-opts">
+      <div class="opts-label">顯示指標</div>
+      <div class="chips" id="${tabId}-kpi-chips"></div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="${tabId}-kpi-grid"></div>
+
+    <div class="sep"></div>
+
+    <!-- Chart Display Options -->
+    <div class="opts-bar">
+      <div class="opts-label">圖表顯示</div>
+      <div class="chips" id="${tabId}-chart-chips"></div>
+    </div>
+
+    <!-- Trend Metric Selector -->
+    <div class="trend-metric-row" id="${tabId}-trend-metric-row">
+      <label>趨勢指標</label>
+      <select id="${tabId}-trend-metric">
+        <option value="回廠量">回廠量</option>
+        <option value="不良品數">不良品數</option>
+        <option value="良品數">良品數</option>
+        <option value="過保數">過保數</option>
+      </select>
+    </div>
+
+    <!-- Charts container -->
+    <div id="${tabId}-charts"></div>
+
+    <div class="sep"></div>
+
+    <!-- Lens env analysis (lens only) -->
+    ${tabId==='lens'?`<div id="lens-env-section"></div>`:''}
+
+    <!-- Data Table -->
+    <div class="table-hdr">
+      <div class="sec-title">📋 詳細資料</div>
+      <div class="table-ctrls">
+        <label class="toggle-lbl">
+          <input type="checkbox" id="${tabId}-collapse" onchange="onCollapse('${tabId}')">
+          摺疊明細（僅顯示小計）
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="dlExcel('${tabId}')">⬇️ 下載 .xlsx</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" id="${tabId}-table"></div>
+
+    <div class="sep"></div>
+
+    <!-- Recommendations -->
+    <div class="sec-title">💡 品管 &amp; 採購建議</div>
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:.875rem">系統依指標自動生成初稿，可在文字框內修改後下載使用</p>
+    <div class="rec-tabs">
+      <button class="rec-tab active" onclick="switchRecTab('${tabId}','quality',this)">🔍 品管建議</button>
+      <button class="rec-tab" onclick="switchRecTab('${tabId}','purchase',this)">🛒 採購建議</button>
+    </div>
+    <div id="${tabId}-rec-quality" class="rec-panel active">
+      <textarea class="rec-textarea" id="${tabId}-rec-quality-txt"></textarea>
+      <div class="rec-acts">
+        <button class="btn btn-outline btn-sm" onclick="dlRec('${tabId}','quality')">⬇️ 下載 .txt</button>
+        <button class="btn btn-ghost btn-sm" onclick="regenRec('${tabId}','quality')">🔄 重新生成</button>
+      </div>
+    </div>
+    <div id="${tabId}-rec-purchase" class="rec-panel">
+      <textarea class="rec-textarea" id="${tabId}-rec-purchase-txt"></textarea>
+      <div class="rec-acts">
+        <button class="btn btn-outline btn-sm" onclick="dlRec('${tabId}','purchase')">⬇️ 下載 .txt</button>
+        <button class="btn btn-ghost btn-sm" onclick="regenRec('${tabId}','purchase')">🔄 重新生成</button>
+      </div>
+    </div>
+    <div style="height:2rem"></div>
+  `;
+
+  // Init period selects
+  const curSel = document.getElementById(`${tabId}-cur`);
+  const prvSel = document.getElementById(`${tabId}-prv`);
+  st.periods.forEach(p => {
+    curSel.add(new Option(p,p));
+    prvSel.add(new Option(p,p));
+  });
+  if (st.prvPeriod) prvSel.insertBefore(new Option('（無對比）',''), prvSel.firstChild);
+  else prvSel.add(new Option('（無對比）',''));
+  curSel.value = st.curPeriod || '';
+  prvSel.value = st.prvPeriod || '';
+  curSel.addEventListener('change', () => { st.curPeriod=curSel.value||null; onFilterChange(tabId,'vendor'); });
+  prvSel.addEventListener('change', () => { st.prvPeriod=prvSel.value||null; renderAll(tabId); });
+
+  // Init multiselects
+  if (hasVendor) {
+    MS[`${tabId}-vendor`] = new MultiSelect(`ms-${tabId}-vendor`, sel => {
+      st.filters.vendors = sel; onFilterChange(tabId,'vendor');
+    });
+  }
+  MS[`${tabId}-brand`] = new MultiSelect(`ms-${tabId}-brand`, sel => {
+    st.filters.brands = sel; onFilterChange(tabId,'brand');
+  });
+  if (hasErp) {
+    MS[`${tabId}-erp`] = new MultiSelect(`ms-${tabId}-erp`, sel => {
+      st.filters.erps = sel; renderAll(tabId);
+    });
+  }
+
+  // KPI chips
+  const kpiDefs = ['總上線量','期間回廠量','期間再使用率','期間不良率','整體不良率','整體過保率'];
+  const kpiChipsEl = document.getElementById(`${tabId}-kpi-chips`);
+  kpiDefs.forEach(k => {
+    const chip = document.createElement('label');
+    chip.className = 'chip' + (st.displayKpis.has(k)?' on':'');
+    chip.innerHTML = `<span class="chip-dot"></span>${k}`;
+    chip.addEventListener('click', () => {
+      if(st.displayKpis.has(k)) st.displayKpis.delete(k); else st.displayKpis.add(k);
+      chip.classList.toggle('on', st.displayKpis.has(k));
+      renderKpis(tabId);
+    });
+    kpiChipsEl.appendChild(chip);
+  });
+
+  // Chart chips
+  const chartDefs = ['上線量品質占比','派工回廠品質占比','回廠原因分佈','處置結果分佈','月趨勢','廠商趨勢比較'];
+  const chartChipsEl = document.getElementById(`${tabId}-chart-chips`);
+  chartDefs.forEach(k => {
+    if (k==='月趨勢' && !hasTrend) return;
+    if (k==='廠商趨勢比較' && !hasVendor) return;
+    const chip = document.createElement('label');
+    chip.className = 'chip' + (st.displayCharts.has(k)?' on':'');
+    chip.innerHTML = `<span class="chip-dot"></span>${k}`;
+    chip.addEventListener('click', () => {
+      if(st.displayCharts.has(k)) st.displayCharts.delete(k); else st.displayCharts.add(k);
+      chip.classList.toggle('on', st.displayCharts.has(k));
+      renderCharts(tabId);
+    });
+    chartChipsEl.appendChild(chip);
+  });
+
+  // Trend metric
+  document.getElementById(`${tabId}-trend-metric`).addEventListener('change', e => {
+    st.trendMetric = e.target.value; renderCharts(tabId);
+  });
+
+  // Init filter options
+  onFilterChange(tabId, 'vendor');
+}
+
+function onFilterChange(tabId, level) {
+  const st = appState[tabId];
+  const df = st.processed.filter(r=>r['期間']===st.curPeriod);
+
+  if (level==='vendor') {
+    // Update brand options
+    const vFiltered = st.filters.vendors.length ? df.filter(r=>st.filters.vendors.includes(String(r['廠商']||''))) : df;
+    const brandOpts = sortAsc(unique(vFiltered.map(r=>String(r[st.brandCol]||''))));
+    MS[`${tabId}-brand`]?.setOptions(brandOpts, true);
+    st.filters.brands = MS[`${tabId}-brand`]?.getSelected()||[];
+  }
+
+  if (level==='vendor' || level==='brand') {
+    // Update ERP options
+    let sub = df;
+    if (st.filters.vendors.length) sub=sub.filter(r=>st.filters.vendors.includes(String(r['廠商']||'')));
+    if (st.filters.brands.length)  sub=sub.filter(r=>st.filters.brands.includes(String(r[st.brandCol]||'')));
+    if (st.hasErp) {
+      const erpOpts = sortAsc(unique(sub.map(r=>getLabel(r))));
+      MS[`${tabId}-erp`]?.setOptions(erpOpts, true);
+      st.filters.erps = MS[`${tabId}-erp`]?.getSelected()||[];
+    }
+  }
+
+  renderAll(tabId);
+}
+
+// ════════════════════════════════════════════════════════
+// RENDER ALL
+// ════════════════════════════════════════════════════════
+function renderAll(tabId) {
+  const st = appState[tabId];
+  if (!st.processed.length) return;
+
+  const dfCurAll = st.processed.filter(r=>r['期間']===st.curPeriod);
+  const dfPrvAll = st.prvPeriod ? st.processed.filter(r=>r['期間']===st.prvPeriod) : [];
+
+  st.curFiltered = filterRows(dfCurAll, st);
+  st.prvFiltered = dfPrvAll.length ? filterRows(dfPrvAll, st) : [];
+
+  st.kpiC = calcKpi(st.curFiltered);
+  st.kpiP = st.prvFiltered.length ? calcKpi(st.prvFiltered) : null;
+
+  renderKpis(tabId);
+  renderCharts(tabId);
+  renderTable(tabId);
+  renderRecs(tabId);
+}
+
+// ════════════════════════════════════════════════════════
+// KPI RENDER
+// ════════════════════════════════════════════════════════
+function renderKpis(tabId) {
+  const st = appState[tabId];
+  const kc = st.kpiC;
+  const kp = st.kpiP;
+  const grid = document.getElementById(`${tabId}-kpi-grid`);
+  if (!grid || !kc) return;
+
+  const worseHigh = new Set(['期間不良率','整體不良率','整體過保率','期間過保率']);
+  const defs = [
+    { key:'總上線量',    val:fmt(kc.total_on),           raw:kc.total_on,     prev:kp?.total_on },
+    { key:'期間回廠量',  val:fmt(kc.total_ret),          raw:kc.total_ret,    prev:kp?.total_ret },
+    { key:'期間再使用率', val:fmtPct(kc.reuse_rate),    raw:kc.reuse_rate,   prev:kp?.reuse_rate },
+    { key:'期間不良率',  val:fmtPct(kc.bad_rate),       raw:kc.bad_rate,     prev:kp?.bad_rate },
+    { key:'整體不良率',  val:fmtPct(kc.ovr_bad_rate),   raw:kc.ovr_bad_rate, prev:kp?.ovr_bad_rate },
+    { key:'整體過保率',  val:fmtPct(kc.ovr_scr_rate),   raw:kc.ovr_scr_rate, prev:kp?.ovr_scr_rate },
+  ];
+
+  const shown = defs.filter(d=>st.displayKpis.has(d.key));
+  grid.innerHTML = shown.map(d => {
+    let deltaHtml = '<span class="kpi-delta neu">—</span>';
+    if (d.prev != null) {
+      const diff = d.raw - d.prev;
+      const isNum = d.key === '總上線量' || d.key === '期間回廠量';
+      const sign = diff>=0?'+':'';
+      const dStr = isNum ? sign+fmt(Math.round(diff)) : sign+r1(diff).toFixed(1)+'%';
+      const worse = worseHigh.has(d.key) ? diff>0 : diff<0;
+      const cls = diff===0?'neu': (worse?'neg':'pos');
+      deltaHtml = `<span class="kpi-delta ${cls}">${dStr} vs ${st.prvPeriod}</span>`;
+    }
+    return `<div class="kpi-card">
+      <div class="kpi-label">${esc(d.key)}</div>
+      <div class="kpi-val">${d.val}</div>
+      ${deltaHtml}
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// CHART RENDER
+// ════════════════════════════════════════════════════════
+function renderCharts(tabId) {
+  const st = appState[tabId];
+  const cfg = CFG[tabId];
+  const kc = st.kpiC;
+  const kp = st.kpiP;
+  const dfC = st.curFiltered;
+  const dfP = st.prvFiltered;
+  const shown = st.displayCharts;
+  const container = document.getElementById(`${tabId}-charts`);
+  if (!container || !kc) return;
+
+  container.innerHTML = '';
+
+  const showOnline = shown.has('上線量品質占比');
+  const showReturn = shown.has('派工回廠品質占比');
+  if (showOnline || showReturn) {
+    const row = document.createElement('div');
+    row.className = 'chart-grid';
+    if (showOnline) row.appendChild(buildDonutCard(tabId,'online',kc,cfg.name));
+    if (showReturn) row.appendChild(buildDonutCard(tabId,'return',kc,cfg.name));
+    container.appendChild(row);
+  }
+
+  if (shown.has('回廠原因分佈')) {
+    const row = document.createElement('div');
+    row.className = 'chart-grid';
+    const card = document.createElement('div');
+    card.className = 'chart-card wide';
+    card.innerHTML = `<div class="chart-subtitle">📌 回廠原因分佈</div>
+      <div class="pie-pair">
+        <div id="${tabId}-fault-cur"></div>
+        <div id="${tabId}-fault-prv"></div>
+      </div>`;
+    row.appendChild(card);
+    container.appendChild(row);
+    setTimeout(()=>{
+      plotPie(`${tabId}-fault-cur`, dfC, cfg.faultCols, `${cfg.name}｜回廠原因（${st.curPeriod}）`);
+      if (kp) plotPie(`${tabId}-fault-prv`, dfP, cfg.faultCols, `${cfg.name}｜回廠原因（${st.prvPeriod}）`);
+      else document.getElementById(`${tabId}-fault-prv`).innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:.85rem">無對比資料</div>';
+    },0);
+  }
+
+  if (shown.has('處置結果分佈')) {
+    const row = document.createElement('div');
+    row.className = 'chart-grid';
+    const card = document.createElement('div');
+    card.className = 'chart-card wide';
+    card.innerHTML = `<div class="chart-subtitle">✅ 處置結果分佈</div>
+      <div class="pie-pair">
+        <div id="${tabId}-disp-cur"></div>
+        <div id="${tabId}-disp-prv"></div>
+      </div>`;
+    row.appendChild(card);
+    container.appendChild(row);
+    setTimeout(()=>{
+      plotDisposal(`${tabId}-disp-cur`, kc, `${cfg.name}｜處置結果（${st.curPeriod}）`);
+      if(kp) plotDisposal(`${tabId}-disp-prv`, kp, `${cfg.name}｜處置結果（${st.prvPeriod}）`);
+      else document.getElementById(`${tabId}-disp-prv`).innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:.85rem">無對比資料</div>';
+    },0);
+  }
+
+  // Show/hide trend metric selector
+  const tmRow = document.getElementById(`${tabId}-trend-metric-row`);
+  const showTrendAny = (shown.has('月趨勢') && st.trendRaw.length>0) || (shown.has('廠商趨勢比較') && st.hasVendor);
+  if (tmRow) tmRow.style.display = showTrendAny ? 'flex' : 'none';
+
+  if (shown.has('廠商趨勢比較') && st.hasVendor) {
+    const card = document.createElement('div');
+    card.className = 'chart-card wide';
+    card.innerHTML = `<div class="chart-subtitle">📈 廠商趨勢比較</div><div id="${tabId}-vendor-trend"></div>`;
+    container.appendChild(card);
+    setTimeout(()=>plotVendorTrend(`${tabId}-vendor-trend`, st, cfg), 0);
+  }
+
+  if (shown.has('月趨勢') && st.trendRaw.length>0) {
+    const card = document.createElement('div');
+    card.className = 'chart-card wide';
+    card.innerHTML = `<div class="chart-subtitle">📅 月趨勢</div><div id="${tabId}-month-trend"></div>`;
+    container.appendChild(card);
+    setTimeout(()=>plotMonthTrend(`${tabId}-month-trend`, st, cfg), 0);
+  }
+
+  // Lens env analysis
+  if (tabId==='lens') renderLensEnv(st);
+}
+
+function buildDonutCard(tabId, type, kc, name) {
+  const isOnline = type==='online';
+  const chartId = `${tabId}-donut-${type}`;
+  const tblId   = `${tabId}-donut-${type}-tbl`;
+  const capId   = `${tabId}-donut-${type}-cap`;
+  const card = document.createElement('div');
+  card.className = 'chart-card';
+
+  const title = isOnline ? '上線量品質占比' : '派工回廠品質占比';
+  card.innerHTML = `<div class="chart-subtitle">${isOnline?'🔵':'🟠'} ${title}</div>
+    <div class="donut-layout">
+      <div>
+        <table class="donut-tbl" id="${tblId}"></table>
+        <p class="donut-cap" id="${capId}"></p>
+      </div>
+      <div id="${chartId}" style="min-height:260px"></div>
+    </div>`;
+
+  setTimeout(() => {
+    if (isOnline) plotOnlineDonut(chartId, tblId, capId, kc, name);
+    else plotReturnDonut(chartId, tblId, capId, kc, name);
+  }, 0);
+  return card;
+}
+
+function plotOnlineDonut(chartId, tblId, capId, kc, name) {
+  const rem = Math.max(0, kc.total_on - kc.total_ret);
+  const items = [
+    {l:'仍在線數',v:rem}, {l:'良品數',v:kc.total_good},
+    {l:'過保數',v:kc.total_scrap}, {l:'不良品數',v:kc.total_bad}, {l:'人為數',v:kc.total_human},
+  ].filter(i=>i.v>0);
+  const total = kc.total_on || 1;
+
+  // Summary table
+  const rows = [...items, {l:`上線總量`,v:kc.total_on}];
+  document.getElementById(tblId).innerHTML = rows.map(i=>`<tr><td>${esc(i.l)}</td><td>${fmt(i.v)}</td></tr>`).join('');
+  const scrPct = r1(kc.total_scrap/total*100);
+  const badPct = r1(kc.total_bad/total*100);
+  document.getElementById(capId).textContent = `過保僅占 ${scrPct}%，不良品僅占 ${badPct}%`;
+
+  const labels = items.map(i=>i.l);
+  const values = items.map(i=>i.v);
+  const colors = items.map(i=>ONLINE_MAP[i.l]||COLORS.grey);
+  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?`${i.l}<br>${r1(p).toFixed(1)}%`:p>=1?`${r1(p).toFixed(1)}%`:''; });
+
+  const el = document.getElementById(chartId);
+  if (!el) return;
+  Plotly.newPlot(el, [{
+    type:'pie', hole:0.55, values, labels,
+    marker:{colors}, text:texts, textinfo:'text',
+    textposition:'inside', insidetextorientation:'horizontal',
+    hoverinfo:'label+value+percent', textfont:{size:11},
+  }], {
+    height:280, margin:{t:10,b:10,l:10,r:10},
+    showlegend:true, legend:{orientation:'h',y:-0.05,x:0.5,xanchor:'center',font:{size:10}},
+    annotations:[{text:`上線<br>${fmt(kc.total_on)}`,showarrow:false,font:{size:11},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
+  }, {responsive:true, displayModeBar:false});
+}
+
+function plotReturnDonut(chartId, tblId, capId, kc, name) {
+  const items = [
+    {l:'良品數',v:kc.total_good}, {l:'過保數',v:kc.total_scrap},
+    {l:'不良品數',v:kc.total_bad}, {l:'人為數',v:kc.total_human},
+  ].filter(i=>i.v>0);
+  const total = kc.total_ret || 1;
+
+  document.getElementById(tblId).innerHTML = [...items,{l:'回廠總量',v:kc.total_ret}].map(i=>`<tr><td>${esc(i.l)}</td><td>${fmt(i.v)}</td></tr>`).join('');
+  const gdPct = r1(kc.total_good/total*100);
+  document.getElementById(capId).textContent = `良品（再使用）佔 ${gdPct}%`;
+
+  const labels = items.map(i=>i.l);
+  const values = items.map(i=>i.v);
+  const colors = items.map(i=>RETURN_MAP[i.l]||COLORS.grey);
+  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?`${i.l}<br>${r1(p).toFixed(1)}%`:p>=1?`${r1(p).toFixed(1)}%`:''; });
+
+  const el = document.getElementById(chartId);
+  if (!el) return;
+  Plotly.newPlot(el, [{
+    type:'pie', hole:0.55, values, labels,
+    marker:{colors}, text:texts, textinfo:'text',
+    textposition:'inside', insidetextorientation:'horizontal',
+    hoverinfo:'label+value+percent', textfont:{size:11},
+  }], {
+    height:280, margin:{t:10,b:10,l:10,r:10},
+    showlegend:true, legend:{orientation:'h',y:-0.05,x:0.5,xanchor:'center',font:{size:10}},
+    annotations:[{text:`回廠<br>${fmt(kc.total_ret)}`,showarrow:false,font:{size:11},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
+  }, {responsive:true, displayModeBar:false});
+}
+
+function plotPie(elId, rows, faultCols, title) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const avail = faultCols.filter(c=>rows.some(r=>toN(r[c])>0));
+  if (!avail.length || !rows.length) { el.innerHTML='<div style="color:#94a3b8;font-size:.85rem;padding:1rem;text-align:center">無資料</div>'; return; }
+  const totals = avail.map(c=>({l:c,v:rows.reduce((s,r)=>s+toN(r[c]),0)})).filter(i=>i.v>0);
+  Plotly.newPlot(el, [{
+    type:'pie', hole:0.45,
+    values:totals.map(i=>i.v), labels:totals.map(i=>i.l),
+    marker:{colors:PIE_COLORS},
+    textinfo:'percent+label', textposition:'outside',
+  }], {title:{text:title,font:{size:13}},height:320,margin:{t:50,b:30,l:10,r:10},showlegend:false},
+  {responsive:true,displayModeBar:false});
+}
+
+function plotDisposal(elId, kpi, title) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const items = [
+    {l:'良品（再使用）',v:kpi.total_good},
+    {l:'不良品（維修/換貨）',v:kpi.total_bad},
+    {l:'過保/報廢',v:kpi.total_scrap},
+  ].filter(i=>i.v>0);
+  if (!items.length) { el.innerHTML='<div style="color:#94a3b8;font-size:.85rem;padding:1rem;text-align:center">無資料</div>'; return; }
+  Plotly.newPlot(el, [{
+    type:'pie', hole:0.45,
+    values:items.map(i=>i.v), labels:items.map(i=>i.l),
+    marker:{colors:items.map(i=>DISPOSAL_MAP[i.l])},
+    textinfo:'percent+label', textposition:'outside',
+  }], {title:{text:title,font:{size:13}},height:320,margin:{t:50,b:30,l:10,r:10},showlegend:false},
+  {responsive:true,displayModeBar:false});
+}
+
+function plotVendorTrend(elId, st, cfg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const metric = st.trendMetric;
+  const dfAll = st.processed;
+  if (!dfAll.some(r=>r[metric]!=null)) { el.innerHTML=`<div class="alert alert-info">廠商資料中找不到「${metric}」欄位</div>`; return; }
+
+  let data = dfAll;
+  if (st.filters.vendors.length) data=data.filter(r=>st.filters.vendors.includes(String(r['廠商']||'')));
+  if (st.filters.brands.length)  data=data.filter(r=>st.filters.brands.includes(String(r[st.brandCol]||'')));
+
+  const vendors = unique(data.map(r=>String(r['廠商']||'')));
+  const byPeriod = new Map();
+  data.forEach(r=>{
+    const k = String(r['廠商']||'');
+    const p = String(r['期間']||'');
+    if (!byPeriod.has(k)) byPeriod.set(k,{});
+    byPeriod.get(k)[p] = (byPeriod.get(k)[p]||0) + toN(r[metric]);
+  });
+
+  const allPeriods = sortAsc(unique(data.map(r=>String(r['期間']||''))));
+  const palette=['#4472c4','#ed7d31','#a9d18e','#ffc000','#70ad47','#c55a11'];
+  const traces = vendors.map((v,i)=>({
+    x:allPeriods, y:allPeriods.map(p=>byPeriod.get(v)?.[p]||0),
+    mode:'lines+markers', name:v, line:{width:2.5,color:palette[i%palette.length]},
+    marker:{size:8},
+  }));
+
+  Plotly.newPlot(el, traces, {
+    height:380, margin:{t:20,b:50,l:60,r:20},
+    xaxis:{title:'期間'}, yaxis:{title:metric},
+    legend:{orientation:'h',y:-0.2,x:0.5,xanchor:'center'},
+    plot_bgcolor:'#fff', paper_bgcolor:'#fff',
+  }, {responsive:true,displayModeBar:false});
+}
+
+function plotMonthTrend(elId, st, cfg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const metric = st.trendMetric;
+  const trendPeriods = [st.curPeriod, st.prvPeriod].filter(Boolean);
+  let dt = st.trendRaw.filter(r=>trendPeriods.includes(String(r['期間']||'')));
+
+  if (!dt.length) { el.innerHTML='<div class="alert alert-info">月趨勢工作表中無對應期間資料</div>'; return; }
+  if (!dt.some(r=>r['年月']!=null)) { el.innerHTML='<div class="alert alert-info">月趨勢工作表缺少「年月」欄位</div>'; return; }
+
+  // Apply filters
+  const tBrandCol = getBrandCol(Object.keys(dt[0]||{}));
+  if (st.filters.vendors.length && dt.some(r=>r['廠商']!=null)) dt=dt.filter(r=>st.filters.vendors.includes(String(r['廠商']||'')));
+  if (st.filters.brands.length)  dt=dt.filter(r=>st.filters.brands.includes(String(r[tBrandCol]||'')));
+
+  // Aggregate by (期間, 年月)
+  const aggMap = new Map();
+  dt.forEach(r=>{
+    const k = `${r['期間']}|||${r['年月']}`;
+    aggMap.set(k, (aggMap.get(k)||0)+toN(r[metric]));
+  });
+
+  const pColors = {'cur':'#4e79a7','prv':'#f28e2b'};
+  const traces = trendPeriods.map((period,i)=>{
+    const entries = [...aggMap.entries()].filter(([k])=>k.startsWith(period+'|||')).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+    const months = entries.map(([k])=>{ const m=k.split('|||')[1]; return String(m||'').slice(-2)+'月'; });
+    const values = entries.map(([,v])=>v);
+    return {x:months, y:values, mode:'lines+markers', name:period,
+      line:{width:2.5,color:i===0?'#4472c4':'#ed7d31'}, marker:{size:8}};
+  });
+
+  Plotly.newPlot(el, traces, {
+    height:340, margin:{t:20,b:50,l:60,r:20},
+    xaxis:{title:'月份'}, yaxis:{title:metric},
+    legend:{orientation:'h',y:-0.25,x:0.5,xanchor:'center'},
+    plot_bgcolor:'#fff', paper_bgcolor:'#fff',
+  }, {responsive:true,displayModeBar:false});
+}
+
+function renderLensEnv(st) {
+  const sec = document.getElementById('lens-env-section');
+  if (!sec) return;
+  const df = st.curFiltered;
+  if (!df.length) { sec.innerHTML=''; return; }
+
+  const hasEnv = df.some(r=>r['環境類型']!=null && r['環境類型']!=='');
+  sec.innerHTML = `<div class="sep"></div><div class="sec-title">🏠 室內 / 室外鏡頭分析</div>`;
+
+  if (!hasEnv) {
+    sec.innerHTML += `<div class="alert alert-info">啟用此分析需在「鏡頭_彙整總覽」中加入「環境類型」欄位（值：室內／室外），以及「已使用年限」欄位（單位：年）</div>`;
+    return;
+  }
+
+  const metricOpts = ['已使用年限','整體不良率(%)','過保率(%)','回廠量'].filter(c=>df.some(r=>r[c]!=null));
+  const selId = 'lens-env-metric';
+  sec.innerHTML += `<div class="trend-metric-row"><label>分析指標</label>
+    <select id="${selId}">${metricOpts.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('')}</select>
+  </div>
+  <div class="chart-grid" id="lens-env-charts">
+    <div class="chart-card" id="lens-box-chart"></div>
+    <div class="chart-card" id="lens-bar-chart"></div>
+  </div>`;
+
+  setTimeout(()=>{
+    renderLensEnvCharts(metricOpts[0]||'已使用年限', df);
+    document.getElementById(selId)?.addEventListener('change', e => renderLensEnvCharts(e.target.value, df));
+  },0);
+}
+
+function renderLensEnvCharts(metric, df) {
+  const boxEl = document.getElementById('lens-box-chart');
+  const barEl = document.getElementById('lens-bar-chart');
+  if (!boxEl||!barEl) return;
+
+  const indoor  = df.filter(r=>String(r['環境類型']||'')==='室內').map(r=>toN(r[metric]));
+  const outdoor = df.filter(r=>String(r['環境類型']||'')==='室外').map(r=>toN(r[metric]));
+
+  Plotly.newPlot(boxEl, [
+    {y:indoor,  name:'室內',type:'box',boxpoints:'all',marker:{color:'#4472c4'},line:{color:'#4472c4'}},
+    {y:outdoor, name:'室外',type:'box',boxpoints:'all',marker:{color:'#ed7d31'},line:{color:'#ed7d31'}},
+  ], {
+    title:{text:`鏡頭｜${metric} 分布（室內 vs 室外）`,font:{size:13}},
+    height:340,margin:{t:50,b:50,l:60,r:20},
+    yaxis:{title:metric},showlegend:true,
+    plot_bgcolor:'#fff',paper_bgcolor:'#fff',
+  },{responsive:true,displayModeBar:false});
+
+  // Bar chart: age group breakdown if 已使用年限 available
+  if (df.some(r=>r['已使用年限']!=null) && df.some(r=>r['回廠量']!=null)) {
+    const bins = [{l:'0–1年',lo:0,hi:1},{l:'1–3年',lo:1,hi:3},{l:'3–5年',lo:3,hi:5},{l:'5年以上',lo:5,hi:Infinity}];
+    const envs = ['室內','室外'];
+    const traces = envs.map((env,i)=>{
+      const y = bins.map(b=>{
+        return df.filter(r=>String(r['環境類型']||'')==env&&toN(r['已使用年限'])>=b.lo&&toN(r['已使用年限'])<b.hi).reduce((s,r)=>s+toN(r['回廠量']),0);
+      });
+      return {x:bins.map(b=>b.l),y,name:env,type:'bar',marker:{color:i===0?'#4472c4':'#ed7d31'}};
+    });
+    Plotly.newPlot(barEl, traces, {
+      title:{text:'鏡頭｜各年限區間回廠量（室內 vs 室外）',font:{size:13}},
+      barmode:'group',height:340,margin:{t:50,b:50,l:60,r:20},
+      yaxis:{title:'回廠量'},showlegend:true,
+      plot_bgcolor:'#fff',paper_bgcolor:'#fff',
+    },{responsive:true,displayModeBar:false});
+  } else {
+    barEl.innerHTML = '';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// TABLE RENDER
+// ════════════════════════════════════════════════════════
+function renderTable(tabId) {
+  const st = appState[tabId];
+  const df = st.curFiltered;
+  const wrap = document.getElementById(`${tabId}-table`);
+  if (!wrap || !df.length) return;
+
+  const cols = Object.keys(df[0]);
+  const bc = st.brandCol;
+  const showCols = [bc,'ERP品號','品名','上線量','回廠量','良品數','再使用率(%)','不良品數','不良率(%)','過保數','過保率(%)','已使用年限','整體不良率(%)','整體過保率(%)'].filter(c=>cols.includes(c)||c===bc);
+  const numCols = ['上線量','回廠量','良品數','不良品數','過保數'].filter(c=>cols.includes(c));
+  const pctCols = ['再使用率(%)','不良率(%)','過保率(%)','整體不良率(%)','整體過保率(%)'];
+
+  const groups = groupBy(df, r=>String(r[bc]||''));
+  const tableRows = [];
+
+  for (const [brand, grp] of groups) {
+    if (!st.collapse) grp.forEach(r=>tableRows.push({row:r,type:'detail'}));
+    tableRows.push({row:buildSub(grp,bc,brand,numCols), type:'subtotal'});
+  }
+  tableRows.push({row:buildSub(df,bc,'★ 總計',numCols), type:'total'});
+
+  const headers = showCols.map(c=>{
+    const isLeft = c===bc||c==='ERP品號'||c==='品名';
+    const label = c===bc?'類型':(c==='已使用年限'?'已使用年限(年)':c);
+    return `<th class="${isLeft?'l':''}">${esc(label)}</th>`;
+  }).join('');
+
+  const bodyRows = tableRows.map(({row,type})=>{
+    const tds = showCols.map(c=>{
+      const isLeft = c===bc||c==='ERP品號'||c==='品名';
+      const v = row[c];
+      let display;
+      if (c===bc) display = type==='total'?'★ 總計':(type==='subtotal'?esc(row[bc]||'')+'<small style="color:#64748b;font-weight:400;margin-left:.4rem">小計</small>':esc(v||''));
+      else if (c==='ERP品號'&&type!=='detail') display='';
+      else if (c==='品名'&&type!=='detail') display='';
+      else if (numCols.includes(c)) display=fmt(Math.round(toN(v)));
+      else if (pctCols.includes(c)) display=r1(toN(v)).toFixed(1)+'%';
+      else display=esc(v||'');
+      return `<td class="${isLeft?'l':''}">${display}</td>`;
+    }).join('');
+    return `<tr class="${type==='subtotal'?'sub':type==='total'?'tot':''}">${tds}</tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+}
+
+function buildSub(rows, bc, label, numCols) {
+  const sub = {};
+  sub[bc] = label;
+  numCols.forEach(c=>{ sub[c]=rows.reduce((s,r)=>s+toN(r[c]),0); });
+  const ret=sub['回廠量']||0, on=sub['上線量']||0;
+  sub['再使用率(%)']   = r1(safeDiv(sub['良品數']||0,ret)*100);
+  sub['不良率(%)']    = r1(safeDiv(sub['不良品數']||0,ret)*100);
+  sub['過保率(%)']    = r1(safeDiv(sub['過保數']||0,ret)*100);
+  sub['整體不良率(%)'] = r1(safeDiv(sub['不良品數']||0,on)*100);
+  sub['整體過保率(%)'] = r1(safeDiv(sub['過保數']||0,on)*100);
+  return sub;
+}
+
+// ════════════════════════════════════════════════════════
+// RECOMMENDATIONS
+// ════════════════════════════════════════════════════════
+function genQualityRec(kc, kp, pc, pp, name, faultCols, df) {
+  const ppLabel = pp || '（無對比資料）';
+  const lines = [`【${name} 品管建議】 ${pc} vs ${ppLabel}`, '─'.repeat(40)];
+
+  const bad = kc.ovr_bad_rate;
+  const dBad = kp ? kc.ovr_bad_rate - kp.ovr_bad_rate : null;
+  const dBadStr = dBad!=null ? `（較去年同期 ${dBad>=0?'+':''}${r1(dBad).toFixed(1)}%）` : '';
+  if (bad >= 5) lines.push(`⚠️ 整體不良率 ${r1(bad).toFixed(1)}%${dBadStr} 偏高，建議加強來料 IQC 抽驗標準，並要求供應商提交 8D 改善報告。`);
+  else if (dBad!=null && dBad > 1) lines.push(`📈 整體不良率 ${r1(bad).toFixed(1)}%${dBadStr}，呈上升趨勢，請追蹤是否有批次性品質異常。`);
+  else lines.push(`✅ 整體不良率 ${r1(bad).toFixed(1)}%${dBadStr}，品質表現穩定。`);
+
+  const reuse = kc.reuse_rate;
+  const dR = kp ? kc.reuse_rate - kp.reuse_rate : null;
+  const dRStr = dR!=null ? `（較去年同期 ${dR>=0?'+':''}${r1(dR).toFixed(1)}%）` : '';
+  if (reuse >= 70) lines.push(`✅ 再使用率 ${r1(reuse).toFixed(1)}%${dRStr}，維修品質良好，可維持現行維修 SOP。`);
+  else lines.push(`⚠️ 再使用率 ${r1(reuse).toFixed(1)}%${dRStr}，偏低，建議檢視維修流程及技師技術水準，必要時安排教育訓練。`);
+
+  const cols = Object.keys(df[0]||{});
+  const avail = faultCols.filter(c=>cols.includes(c));
+  if (avail.length) {
+    const totals = avail.map(c=>({l:c,v:df.reduce((s,r)=>s+toN(r[c]),0)})).filter(i=>i.v>0).sort((a,b)=>b.v-a.v);
+    if (totals.length) {
+      const total = totals.reduce((s,i)=>s+i.v,0);
+      const top = totals[0];
+      const topPct = top.v/total*100;
+      if (topPct >= 40) lines.push(`🔍 主要故障原因為「${top.l}」（佔 ${r1(topPct).toFixed(1)}%），建議針對此問題建立專項改善計畫，設定月度追蹤指標。`);
+      else {
+        const t3 = totals.slice(0,3).map(i=>`${i.l}（${r1(i.v/total*100).toFixed(0)}%）`).join('、');
+        lines.push(`🔍 故障原因較分散，前三項為：${t3}，建議各項分別追蹤改善。`);
+      }
+    }
+  }
+
+  const scr = kc.ovr_scr_rate;
+  const dS = kp ? kc.ovr_scr_rate - kp.ovr_scr_rate : null;
+  const dSStr = dS!=null ? `（較去年同期 ${dS>=0?'+':''}${r1(dS).toFixed(1)}%）` : '';
+  if (scr >= 3) lines.push(`⚠️ 整體過保率 ${r1(scr).toFixed(1)}%${dSStr}，建議統計過保品平均使用年限，作為下次汰換計畫依據，並檢視保固條款是否需調整。`);
+  else lines.push(`✅ 整體過保率 ${r1(scr).toFixed(1)}%${dSStr}，目前過保狀況在可控範圍內。`);
+
+  lines.push('', '*以上建議為系統自動生成，請依實際情況修改後使用。*');
+  return lines.join('\n');
+}
+
+function genPurchaseRec(kc, kp, pc, pp, name, df, bc) {
+  const ppLabel = pp || '（無對比資料）';
+  const lines = [`【${name} 採購建議】 ${pc} vs ${ppLabel}`, '─'.repeat(40)];
+
+  const cols = Object.keys(df[0]||{});
+  const hasYears = cols.includes('已使用年限');
+  const hasScrPct = cols.includes('過保率(%)');
+  const hasBadPct = cols.includes('整體不良率(%)');
+
+  if (hasYears && hasScrPct) {
+    const hi = df.filter(r=>toN(r['過保率(%)'])>=10 && toN(r['已使用年限'])>0);
+    if (hi.length) {
+      const items = hi.sort((a,b)=>toN(b['過保率(%)'])-toN(a['過保率(%)'])).slice(0,3).map(r=>String(r[bc]||''));
+      lines.push(`🔄 下列類型過保率偏高（≥10%），建議優先列入汰換採購計畫：\n  ${items.join('、')}`);
+    } else { lines.push('✅ 目前無高過保率品項需緊急汰換。'); }
+  } else { lines.push('（需有「已使用年限」及「過保率(%)」欄位，方可自動判斷汰換建議）'); }
+
+  if (hasBadPct) {
+    const hi2 = df.filter(r=>toN(r['整體不良率(%)'])>=5);
+    if (hi2.length) {
+      const items2 = hi2.sort((a,b)=>toN(b['整體不良率(%)'])-toN(a['整體不良率(%)'])).slice(0,3).map(r=>String(r[bc]||''));
+      lines.push(`📋 下列類型整體不良率偏高（≥5%），建議要求廠商提出品質改善計畫，或評估替換供應商：\n  ${items2.join('、')}`);
+    }
+  }
+
+  if (kp && kp.total_ret > 0) {
+    const deltaPct = (kc.total_ret - kp.total_ret) / kp.total_ret * 100;
+    if (deltaPct >= 15) lines.push(`📈 回廠量較去年同期上升 ${r1(deltaPct).toFixed(1)}%，建議採購合約加入品質保證條款，並提高新批次 AQL 抽樣比例。`);
+    else if (deltaPct <= -10) lines.push(`📉 回廠量較去年同期下降 ${r1(Math.abs(deltaPct)).toFixed(1)}%，品質改善明顯，可維持現行採購策略，適時與供應商確認品質保持計畫。`);
+  }
+
+  lines.push('', '*以上建議為系統自動生成，請依實際情況修改後使用。*');
+  return lines.join('\n');
+}
+
+function renderRecs(tabId) {
+  const st = appState[tabId];
+  const cfg = CFG[tabId];
+  if (!st.kpiC) return;
+  const qEl = document.getElementById(`${tabId}-rec-quality-txt`);
+  const pEl = document.getElementById(`${tabId}-rec-purchase-txt`);
+  if (qEl) qEl.value = genQualityRec(st.kpiC,st.kpiP,st.curPeriod,st.prvPeriod,cfg.name,cfg.faultCols,st.curFiltered);
+  if (pEl) pEl.value = genPurchaseRec(st.kpiC,st.kpiP,st.curPeriod,st.prvPeriod,cfg.name,st.curFiltered,st.brandCol);
+}
+
+// ════════════════════════════════════════════════════════
+// DOWNLOADS
+// ════════════════════════════════════════════════════════
+function dlExcel(tabId) {
+  const st = appState[tabId];
+  const df = st.curFiltered;
+  if (!df.length) return;
+  const bc = st.brandCol;
+  const cols = Object.keys(df[0]);
+  const showCols = [bc,'ERP品號','品名','上線量','回廠量','良品數','再使用率(%)','不良品數','不良率(%)','過保數','過保率(%)','已使用年限','整體不良率(%)','整體過保率(%)'].filter(c=>cols.includes(c)||c===bc);
+
+  const rows = df.map(r=>{
+    const obj={};
+    showCols.forEach(c=>{ obj[c===bc?'類型':c]=r[c]!==undefined?r[c]:''; });
+    return obj;
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, st.curPeriod||'Sheet1');
+  XLSX.writeFile(wb, `${CFG[tabId].name}_${st.curPeriod||''}_篩選結果.xlsx`);
+}
+
+function dlRec(tabId, type) {
+  const el = document.getElementById(`${tabId}-rec-${type}-txt`);
+  if (!el) return;
+  const text = el.value;
+  const st = appState[tabId];
+  const filename = `${CFG[tabId].name}_${st.curPeriod||''}_${type==='quality'?'品管建議':'採購建議'}.txt`;
+  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function regenRec(tabId, type) {
+  renderRecs(tabId);
+}
+
+// ════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════
+let _activeTab = 'car';
+
+function switchTab(tabId) {
+  _activeTab = tabId;
+  ['car','lens'].forEach(t=>{
+    document.getElementById(`tab-${t}`).style.display = t===tabId?'block':'none';
+    document.getElementById(`tab-btn-${t}`).classList.toggle('active', t===tabId);
+  });
+  // Trigger resize to fix Plotly charts
+  setTimeout(()=>window.dispatchEvent(new Event('resize')),50);
+}
+
+function switchRecTab(tabId, type, btn) {
+  ['quality','purchase'].forEach(t=>{
+    document.getElementById(`${tabId}-rec-${t}`)?.classList.toggle('active', t===type);
+  });
+  btn.closest('.rec-tabs').querySelectorAll('.rec-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function onCollapse(tabId) {
+  appState[tabId].collapse = document.getElementById(`${tabId}-collapse`).checked;
+  renderTable(tabId);
+}
+
+function showLoading(v) {
+  document.getElementById('loading').style.display = v ? 'flex' : 'none';
+}
+
+function resetApp() {
+  appState.sheets={};
+  ['car','lens'].forEach(t=>{ Object.assign(appState[t], makeTabState()); });
+  Object.keys(MS).forEach(k=>delete MS[k]);
+  document.getElementById('upload-zone').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('file-input').value='';
+}
+
+// ════════════════════════════════════════════════════════
+// FILE EVENTS
+// ════════════════════════════════════════════════════════
+document.getElementById('file-input').addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(f) handleFile(f);
+});
+
+const dropArea = document.getElementById('drop-area');
+dropArea.addEventListener('dragover', e=>{ e.preventDefault(); dropArea.classList.add('drag-over'); });
+dropArea.addEventListener('dragleave', ()=>dropArea.classList.remove('drag-over'));
+dropArea.addEventListener('drop', e=>{
+  e.preventDefault(); dropArea.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if(f && f.name.endsWith('.xlsx')) handleFile(f);
+  else alert('請上傳 .xlsx 格式的 Excel 檔案');
+});
+
+// Hide loading on init
+showLoading(false);
+</script>
+</body>
+</html>

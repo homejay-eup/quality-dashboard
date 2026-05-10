@@ -89,7 +89,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 /* ── Display Options ── */
 .opts-bar{background:#fff;border-radius:1rem;padding:1rem 1.25rem;border:1px solid #e2e8f0;margin-bottom:1.25rem}
-.opts-label{font-size:.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.625rem}
+.opts-label{font-size:.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0}
+.opts-bar:not(.collapsed) .opts-label{margin-bottom:.625rem}
+.opts-chevron{font-size:.65rem;color:#94a3b8;transition:transform .2s}
+.opts-bar.collapsed .opts-chevron{transform:rotate(-90deg)}
+.opts-body{display:flex;flex-wrap:wrap;gap:.5rem}
+.opts-bar.collapsed .opts-body{display:none}
 .chips{display:flex;flex-wrap:wrap;gap:.5rem}
 .chip{display:inline-flex;align-items:center;gap:.35rem;padding:.325rem .75rem;border:1.5px solid #e2e8f0;border-radius:9999px;font-size:.78rem;cursor:pointer;transition:all .2s;background:#fff;color:#64748b;user-select:none}
 .chip.on{background:#eff6ff;border-color:#2563eb;color:#2563eb;font-weight:700}
@@ -608,9 +613,9 @@ function buildTabUI(tabId) {
     </div>
 
     <!-- KPI Display Options -->
-    <div class="opts-bar" id="${tabId}-kpi-opts">
-      <div class="opts-label">顯示指標</div>
-      <div class="chips" id="${tabId}-kpi-chips"></div>
+    <div class="opts-bar collapsed" id="${tabId}-kpi-opts">
+      <div class="opts-label" onclick="this.closest('.opts-bar').classList.toggle('collapsed')">指標顯示 <span class="opts-chevron">▼</span></div>
+      <div class="opts-body" id="${tabId}-kpi-chips"></div>
     </div>
 
     <!-- KPI Cards -->
@@ -619,9 +624,9 @@ function buildTabUI(tabId) {
     <div class="sep"></div>
 
     <!-- Chart Display Options -->
-    <div class="opts-bar">
-      <div class="opts-label">圖表顯示</div>
-      <div class="chips" id="${tabId}-chart-chips"></div>
+    <div class="opts-bar collapsed">
+      <div class="opts-label" onclick="this.closest('.opts-bar').classList.toggle('collapsed')">圖表顯示 <span class="opts-chevron">▼</span></div>
+      <div class="opts-body" id="${tabId}-chart-chips"></div>
     </div>
 
     <!-- Trend Metric Selector -->
@@ -1104,9 +1109,13 @@ function plotVendorTrend(elId, st, cfg) {
   }));
 
   Plotly.newPlot(el, traces, {
-    height:380, margin:{t:20,b:80,l:60,r:20},
+    height:380, margin:{t:20,b:80,l:65,r:20},
     autosize:true,
-    xaxis:{title:'期間'}, yaxis:{title:metric},
+    xaxis:{title:''},
+    yaxis:{title:''},
+    annotations:[{x:-0.07,y:0.5,xref:'paper',yref:'paper',
+      text:metric.split('').join('<br>'),showarrow:false,
+      font:{size:12,color:'#555'},textangle:0,xanchor:'center',yanchor:'middle'}],
     legend:{orientation:'h',y:-0.25,x:0.5,xanchor:'center'},
     plot_bgcolor:'#fff', paper_bgcolor:'#fff',
   }, {responsive:true,displayModeBar:false});
@@ -1144,9 +1153,13 @@ function plotMonthTrend(elId, st, cfg) {
   });
 
   Plotly.newPlot(el, traces, {
-    height:340, margin:{t:20,b:70,l:60,r:20},
+    height:340, margin:{t:20,b:70,l:65,r:20},
     autosize:true,
-    xaxis:{title:'月份'}, yaxis:{title:metric},
+    xaxis:{title:''},
+    yaxis:{title:''},
+    annotations:[{x:-0.08,y:0.5,xref:'paper',yref:'paper',
+      text:metric.split('').join('<br>'),showarrow:false,
+      font:{size:12,color:'#555'},textangle:0,xanchor:'center',yanchor:'middle'}],
     legend:{orientation:'h',y:-0.28,x:0.5,xanchor:'center'},
     plot_bgcolor:'#fff', paper_bgcolor:'#fff',
   }, {responsive:true,displayModeBar:false});

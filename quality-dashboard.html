@@ -65,7 +65,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .ms-badge{background:#2563eb;color:#fff;border-radius:9999px;font-size:.68rem;font-weight:700;min-width:1.25rem;height:1.25rem;padding:0 .3rem;display:inline-flex;align-items:center;justify-content:center}
 .ms-arrow{color:#94a3b8;font-size:.7rem;transition:transform .2s;flex-shrink:0}
 .ms-trigger.open .ms-arrow{transform:rotate(180deg)}
-.ms-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid #e2e8f0;border-radius:.625rem;box-shadow:0 10px 25px rgba(0,0,0,.1);z-index:300;overflow:hidden}
+.ms-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid #e2e8f0;border-radius:.625rem;box-shadow:0 10px 25px rgba(0,0,0,.1);z-index:9999;overflow:hidden}
 .ms-srch{padding:.5rem;border-bottom:1px solid #f1f5f9}
 .ms-srch input{width:100%;padding:.35rem .625rem;border:1px solid #e2e8f0;border-radius:.375rem;font-size:.82rem}
 .ms-srch input:focus{outline:none;border-color:#2563eb}
@@ -285,7 +285,9 @@ function makeTabState() {
     hasVendor: false,
     hasErp: false,
     filters: { vendors:[], brands:[], erps:[] },
-    collapse: false,
+    collapseBy: 'type',
+    collapseDetail: false,
+    hiddenCols: new Set(),
     trendMetric: '回廠量',
     displayKpis: new Set(['總上線量','期間回廠量','期間再使用率','整體不良率','整體過保率']),
     displayCharts: new Set(['上線量品質占比','派工回廠品質占比','回廠原因分佈','處置結果分佈','月趨勢','廠商趨勢比較']),
@@ -305,8 +307,9 @@ const fmt = v => Number(v).toLocaleString('zh-TW');
 const fmtPct = v => r1(v).toFixed(1)+'%';
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const unique = arr => [...new Set(arr.filter(Boolean))];
-const sortDesc = arr => [...arr].sort((a,b)=>String(b).localeCompare(String(a),'zh-TW',{numeric:true}));
-const sortAsc = arr => [...arr].sort((a,b)=>String(a).localeCompare(String(b),'zh-TW',{numeric:true}));
+const _tier = s => /^\d/.test(s)?0:/^[A-Za-z]/.test(s)?1:2;
+const sortDesc = arr => [...arr].sort((a,b)=>{ const ta=_tier(String(a)),tb=_tier(String(b)); return ta!==tb?tb-ta:String(b).localeCompare(String(a),'zh-TW',{numeric:true}); });
+const sortAsc  = arr => [...arr].sort((a,b)=>{ const ta=_tier(String(a)),tb=_tier(String(b)); return ta!==tb?ta-tb:String(a).localeCompare(String(b),'zh-TW',{numeric:true}); });
 
 function getBrandCol(cols) {
   return BRAND_COLS.find(c=>cols.includes(c)) || cols[0];
@@ -652,11 +655,25 @@ function buildTabUI(tabId) {
     <div class="table-hdr">
       <div class="sec-title">📋 詳細資料</div>
       <div class="table-ctrls">
-        <label class="toggle-lbl">
-          <input type="checkbox" id="${tabId}-collapse" onchange="onCollapse('${tabId}')">
-          摺疊明細（僅顯示小計）
-        </label>
         <button class="btn btn-outline btn-sm" onclick="dlExcel('${tabId}')">⬇️ 下載 .xlsx</button>
+      </div>
+    </div>
+    <div class="opts-bar collapsed" id="${tabId}-tbl-opts">
+      <div class="opts-label" onclick="this.closest('.opts-bar').classList.toggle('collapsed')">表格設定 <span class="opts-chevron">▼</span></div>
+      <div class="opts-body" style="flex-direction:column;gap:.75rem">
+        <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap">
+          <span style="font-size:.82rem;color:#64748b;font-weight:600">折疊依據：</span>
+          <label class="toggle-lbl"><input type="radio" name="${tabId}-collapseBy" value="type" checked onchange="onCollapseBy('${tabId}',this.value)"> 類型</label>
+          <label class="toggle-lbl"><input type="radio" name="${tabId}-collapseBy" value="vendor" onchange="onCollapseBy('${tabId}',this.value)"> 廠商</label>
+          <label class="toggle-lbl" style="margin-left:.75rem">
+            <input type="checkbox" id="${tabId}-collapseDetail" onchange="onCollapseDetail('${tabId}')">
+            只顯示小計
+          </label>
+        </div>
+        <div>
+          <div style="font-size:.82rem;color:#64748b;font-weight:600;margin-bottom:.4rem">欄位顯示：</div>
+          <div class="chips" id="${tabId}-col-chips"></div>
+        </div>
       </div>
     </div>
     <div class="tbl-wrap" id="${tabId}-table"></div>
@@ -746,6 +763,21 @@ function buildTabUI(tabId) {
       renderCharts(tabId);
     });
     chartChipsEl.appendChild(chip);
+  });
+
+  // Column visibility chips
+  const colToggleDefs = ['廠商','ERP品號','品名','上線量','回廠量','良品數','再使用率(%)','不良品數','不良率(%)','過保數','過保率(%)','已使用年限','整體不良率(%)','整體過保率(%)'];
+  const colChipsEl = document.getElementById(`${tabId}-col-chips`);
+  colToggleDefs.forEach(k => {
+    const chip = document.createElement('label');
+    chip.className = 'chip on';
+    chip.innerHTML = `<span class="chip-dot"></span>${k}`;
+    chip.addEventListener('click', () => {
+      if(st.hiddenCols.has(k)) st.hiddenCols.delete(k); else st.hiddenCols.add(k);
+      chip.classList.toggle('on', !st.hiddenCols.has(k));
+      renderTable(tabId);
+    });
+    colChipsEl.appendChild(chip);
   });
 
   // Trend metric
@@ -1241,41 +1273,56 @@ function renderTable(tabId) {
   const st = appState[tabId];
   const df = st.curFiltered;
   const wrap = document.getElementById(`${tabId}-table`);
-  if (!wrap || !df.length) return;
+  if (!wrap) return;
+  if (!df.length) { wrap.innerHTML = ''; return; }
 
-  const cols = Object.keys(df[0]);
+  const dataCols = Object.keys(df[0]);
   const bc = st.brandCol;
-  const showCols = [bc,'ERP品號','品名','上線量','回廠量','良品數','再使用率(%)','不良品數','不良率(%)','過保數','過保率(%)','已使用年限','整體不良率(%)','整體過保率(%)'].filter(c=>cols.includes(c)||c===bc);
-  const numCols = ['上線量','回廠量','良品數','不良品數','過保數'].filter(c=>cols.includes(c));
+  const vendorCol = '廠商';
+  const groupCol = st.collapseBy === 'vendor' ? vendorCol : bc;
+
+  const allColDefs = [bc, vendorCol, 'ERP品號', '品名', '上線量', '回廠量', '良品數', '再使用率(%)', '不良品數', '不良率(%)', '過保數', '過保率(%)', '已使用年限', '整體不良率(%)', '整體過保率(%)'];
+  const numCols = ['上線量','回廠量','良品數','不良品數','過保數'].filter(c=>dataCols.includes(c));
   const pctCols = ['再使用率(%)','不良率(%)','過保率(%)','整體不良率(%)','整體過保率(%)'];
 
-  const groups = groupBy(df, r=>String(r[bc]||''));
+  const showCols = [groupCol, ...allColDefs.filter(c=>c!==groupCol)].filter(c=>{
+    if (c===groupCol) return true;
+    if (c!==bc && !dataCols.includes(c)) return false;
+    if (st.hiddenCols.has(c)) return false;
+    return true;
+  });
+
+  const groups = groupBy(df, r=>String(r[groupCol]||''));
   const tableRows = [];
-
-  for (const [brand, grp] of groups) {
-    if (!st.collapse) grp.forEach(r=>tableRows.push({row:r,type:'detail'}));
-    tableRows.push({row:buildSub(grp,bc,brand,numCols), type:'subtotal'});
+  for (const [key, grp] of groups) {
+    if (!st.collapseDetail) grp.forEach(r=>tableRows.push({row:r, type:'detail'}));
+    tableRows.push({row:buildSubFor(grp, groupCol, key, numCols), type:'subtotal'});
   }
-  tableRows.push({row:buildSub(df,bc,'★ 總計',numCols), type:'total'});
+  tableRows.push({row:buildSubFor(df, groupCol, '★ 總計', numCols), type:'total'});
 
-  const headers = showCols.map(c=>{
-    const isLeft = c===bc||c==='ERP品號'||c==='品名';
-    const label = c===bc?'類型':(c==='已使用年限'?'已使用年限(年)':c);
-    return `<th class="${isLeft?'l':''}">${esc(label)}</th>`;
-  }).join('');
+  const colLabel = c => c===bc?'類型':c==='已使用年限'?'已使用年限(年)':c;
+  const isLeft = c => c===bc||c===vendorCol||c==='ERP品號'||c==='品名';
+
+  const headers = showCols.map(c=>`<th class="${isLeft(c)?'l':''}">${esc(colLabel(c))}</th>`).join('');
 
   const bodyRows = tableRows.map(({row,type})=>{
     const tds = showCols.map(c=>{
-      const isLeft = c===bc||c==='ERP品號'||c==='品名';
       const v = row[c];
       let display;
-      if (c===bc) display = type==='total'?'★ 總計':(type==='subtotal'?esc(row[bc]||'')+'<small style="color:#64748b;font-weight:400;margin-left:.4rem">小計</small>':esc(v||''));
-      else if (c==='ERP品號'&&type!=='detail') display='';
-      else if (c==='品名'&&type!=='detail') display='';
-      else if (numCols.includes(c)) display=fmt(Math.round(toN(v)));
-      else if (pctCols.includes(c)) display=r1(toN(v)).toFixed(1)+'%';
-      else display=esc(v||'');
-      return `<td class="${isLeft?'l':''}">${display}</td>`;
+      if (c===groupCol) {
+        if (type==='total') display='★ 總計';
+        else if (type==='subtotal') display=esc(v||'')+'<small style="color:#64748b;font-weight:400;margin-left:.4rem">小計</small>';
+        else display=esc(v||'');
+      } else if ((c==='ERP品號'||c==='品名')&&type!=='detail') {
+        display='';
+      } else if (numCols.includes(c)) {
+        display=fmt(Math.round(toN(v)));
+      } else if (pctCols.includes(c)) {
+        display=r1(toN(v)).toFixed(1)+'%';
+      } else {
+        display=esc(v||'');
+      }
+      return `<td class="${isLeft(c)?'l':''}">${display}</td>`;
     }).join('');
     return `<tr class="${type==='subtotal'?'sub':type==='total'?'tot':''}">${tds}</tr>`;
   }).join('');
@@ -1283,9 +1330,9 @@ function renderTable(tabId) {
   wrap.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>${bodyRows}</tbody></table>`;
 }
 
-function buildSub(rows, bc, label, numCols) {
+function buildSubFor(rows, groupCol, label, numCols) {
   const sub = {};
-  sub[bc] = label;
+  sub[groupCol] = label;
   numCols.forEach(c=>{ sub[c]=rows.reduce((s,r)=>s+toN(r[c]),0); });
   const ret=sub['回廠量']||0, on=sub['上線量']||0;
   sub['再使用率(%)']   = r1(safeDiv(sub['良品數']||0,ret)*100);
@@ -1294,6 +1341,16 @@ function buildSub(rows, bc, label, numCols) {
   sub['整體不良率(%)'] = r1(safeDiv(sub['不良品數']||0,on)*100);
   sub['整體過保率(%)'] = r1(safeDiv(sub['過保數']||0,on)*100);
   return sub;
+}
+
+function onCollapseBy(tabId, val) {
+  appState[tabId].collapseBy = val;
+  renderTable(tabId);
+}
+
+function onCollapseDetail(tabId) {
+  appState[tabId].collapseDetail = document.getElementById(`${tabId}-collapseDetail`).checked;
+  renderTable(tabId);
 }
 
 // ════════════════════════════════════════════════════════
@@ -1395,12 +1452,18 @@ function dlExcel(tabId) {
   const df = st.curFiltered;
   if (!df.length) return;
   const bc = st.brandCol;
-  const cols = Object.keys(df[0]);
-  const showCols = [bc,'ERP品號','品名','上線量','回廠量','良品數','再使用率(%)','不良品數','不良率(%)','過保數','過保率(%)','已使用年限','整體不良率(%)','整體過保率(%)'].filter(c=>cols.includes(c)||c===bc);
+  const dataCols = Object.keys(df[0]);
+  const allColDefs = [bc,'廠商','ERP品號','品名','上線量','回廠量','良品數','再使用率(%)','不良品數','不良率(%)','過保數','過保率(%)','已使用年限','整體不良率(%)','整體過保率(%)'];
+  const showCols = allColDefs.filter(c=>{
+    if (c!==bc && !dataCols.includes(c)) return false;
+    if (st.hiddenCols.has(c)) return false;
+    return true;
+  });
+  const colLabel = c => c===bc?'類型':c==='已使用年限'?'已使用年限(年)':c;
 
   const rows = df.map(r=>{
     const obj={};
-    showCols.forEach(c=>{ obj[c===bc?'類型':c]=r[c]!==undefined?r[c]:''; });
+    showCols.forEach(c=>{ obj[colLabel(c)]=r[c]!==undefined?r[c]:''; });
     return obj;
   });
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -1453,10 +1516,6 @@ function switchRecTab(tabId, type, btn) {
   btn.classList.add('active');
 }
 
-function onCollapse(tabId) {
-  appState[tabId].collapse = document.getElementById(`${tabId}-collapse`).checked;
-  renderTable(tabId);
-}
 
 function showLoading(v) {
   document.getElementById('loading').style.display = v ? 'flex' : 'none';

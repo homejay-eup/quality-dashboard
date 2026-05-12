@@ -320,10 +320,10 @@ const COLORS = {
 
 // Chart color palettes — single warm amber-rust family
 // All base colors are dark enough (contrast ≥ 4.5:1) for white text overlay
-const PIE_COLORS = ['#CC3000','#A05000','#CC6800','#6A1800','#8B3800'];
-const ONLINE_MAP = {'仍在線數':'#1E2840','良品數':'#D4861A','過保數':'#A04A00','不良品數':'#7A1800','人為數':'#B05A00'};
-const RETURN_MAP = {'良品數':'#D4861A','過保數':'#A04A00','不良品數':'#7A1800','人為數':'#B05A00'};
-const DISPOSAL_MAP = {'良品（再使用）':'#D4861A','不良品（維修/換貨）':'#7A1800','過保/報廢':'#A04A00'};
+const PIE_COLORS = ['#A04010','#7A5828','#C47820','#5C2808','#8B5018'];
+const ONLINE_MAP = {'仍在線數':'#4A3020','良品數':'#C4871A','過保數':'#9B5228','不良品數':'#7A1800','人為數':'#B07030'};
+const RETURN_MAP = {'良品數':'#C4871A','過保數':'#9B5228','不良品數':'#7A1800','人為數':'#B07030'};
+const DISPOSAL_MAP = {'良品（再使用）':'#C4871A','不良品（維修/換貨）':'#7A1800','過保/報廢':'#9B5228'};
 
 // SVG gradient injection for pie/donut slices (bright→deep per slice)
 function applyPieGradients(el) {
@@ -331,16 +331,16 @@ function applyPieGradients(el) {
   const svg = el.querySelector('svg.main-svg');
   if (!svg) return;
   const specs = [
-    {base:'#d4861a', id:'pg-good',  c1:'#F0AC30', c2:'#8C5000'},
-    {base:'#7a1800', id:'pg-bad',   c1:'#C03820', c2:'#3C0400'},
-    {base:'#a04a00', id:'pg-scrap', c1:'#CC6A20', c2:'#602000'},
-    {base:'#1e2840', id:'pg-dark',  c1:'#2E3C58', c2:'#0E1830'},
-    {base:'#b05a00', id:'pg-human', c1:'#D07A20', c2:'#703A00'},
-    {base:'#cc3000', id:'pg-p0',    c1:'#FF5020', c2:'#841000'},
-    {base:'#a05000', id:'pg-p1',    c1:'#CC7030', c2:'#602800'},
-    {base:'#cc6800', id:'pg-p2',    c1:'#F09020', c2:'#884000'},
-    {base:'#6a1800', id:'pg-p3',    c1:'#A04020', c2:'#380400'},
-    {base:'#8b3800', id:'pg-p4',    c1:'#B86030', c2:'#501800'},
+    {base:'#c4871a', id:'pg-good',  c1:'#E0A830', c2:'#885800'},
+    {base:'#7a1800', id:'pg-bad',   c1:'#B03820', c2:'#3C0400'},
+    {base:'#9b5228', id:'pg-scrap', c1:'#C07040', c2:'#5A2A08'},
+    {base:'#4a3020', id:'pg-dark',  c1:'#6A5040', c2:'#2A1808'},
+    {base:'#b07030', id:'pg-human', c1:'#D09040', c2:'#703800'},
+    {base:'#a04010', id:'pg-p0',    c1:'#C86030', c2:'#602000'},
+    {base:'#7a5828', id:'pg-p1',    c1:'#A07848', c2:'#402808'},
+    {base:'#c47820', id:'pg-p2',    c1:'#E09A30', c2:'#805000'},
+    {base:'#5c2808', id:'pg-p3',    c1:'#8A4820', c2:'#2A0800'},
+    {base:'#8b5018', id:'pg-p4',    c1:'#B07030', c2:'#4A2808'},
   ];
   let defs = svg.querySelector('defs');
   if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.insertBefore(defs, svg.firstChild); }
@@ -1295,7 +1295,7 @@ function plotVendorTrend(elId, st, cfg) {
   });
 
   const allPeriods = sortAsc(unique(data.map(r=>String(r['期間']||''))));
-  const palette=['#4472c4','#ed7d31','#a9d18e','#ffc000','#70ad47','#c55a11'];
+  const palette=['#6B3A1F','#C4871A','#9B5228','#D4A030','#7A3010','#B07838','#3A2010','#C4601A','#A07840','#8B4510','#D4B850','#5A3828','#E08848','#703820'];
   const traces = vendors.map((v,i)=>({
     x:allPeriods, y:allPeriods.map(p=>byPeriod.get(v)?.[p]||0),
     mode:'lines+markers', name:v, line:{width:2.5,color:palette[i%palette.length]},
@@ -1339,13 +1339,13 @@ function plotMonthTrend(elId, st, cfg) {
     aggMap.set(k, (aggMap.get(k)||0)+toN(r[metric]));
   });
 
-  const pColors = {'cur':'#4e79a7','prv':'#f28e2b'};
+  const pColors = {'cur':'#6B3A1F','prv':'#C4871A'};
   const traces = trendPeriods.map((period,i)=>{
     const entries = [...aggMap.entries()].filter(([k])=>k.startsWith(period+'|||')).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
     const months = entries.map(([k])=>{ const m=k.split('|||')[1]; return String(m||'').slice(-2)+'月'; });
     const values = entries.map(([,v])=>v);
     return {x:months, y:values, mode:'lines+markers', name:period,
-      line:{width:2.5,color:i===0?'#4472c4':'#ed7d31'}, marker:{size:8}};
+      line:{width:2.5,color:i===0?'#6B3A1F':'#C4871A'}, marker:{size:8}};
   });
 
   Plotly.newPlot(el, traces, {
@@ -1402,8 +1402,8 @@ function renderLensEnvCharts(metric, df) {
   const outdoor = df.filter(r=>String(r['環境類型']||'')==='室外').map(r=>toN(r[metric]));
 
   Plotly.newPlot(boxEl, [
-    {y:indoor,  name:'室內',type:'box',boxpoints:'all',marker:{color:'#4472c4'},line:{color:'#4472c4'}},
-    {y:outdoor, name:'室外',type:'box',boxpoints:'all',marker:{color:'#ed7d31'},line:{color:'#ed7d31'}},
+    {y:indoor,  name:'室內',type:'box',boxpoints:'all',marker:{color:'#6B3A1F'},line:{color:'#6B3A1F'}},
+    {y:outdoor, name:'室外',type:'box',boxpoints:'all',marker:{color:'#C4871A'},line:{color:'#C4871A'}},
   ], {
     title:{text:`鏡頭｜${metric} 分布（室內 vs 室外）`,font:{size:13,color:'#1A1208'}},
     height:340, margin:{t:50,b:60,l:60,r:20},
@@ -1420,7 +1420,7 @@ function renderLensEnvCharts(metric, df) {
       const y = bins.map(b=>{
         return df.filter(r=>String(r['環境類型']||'')==env&&toN(r['已使用年限'])>=b.lo&&toN(r['已使用年限'])<b.hi).reduce((s,r)=>s+toN(r['回廠量']),0);
       });
-      return {x:bins.map(b=>b.l),y,name:env,type:'bar',marker:{color:i===0?'#4472c4':'#ed7d31'}};
+      return {x:bins.map(b=>b.l),y,name:env,type:'bar',marker:{color:i===0?'#6B3A1F':'#C4871A'}};
     });
     Plotly.newPlot(barEl, traces, {
       title:{text:'鏡頭｜各年限區間回廠量（室內 vs 室外）',font:{size:13,color:'#1A1208'}},

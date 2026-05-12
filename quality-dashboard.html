@@ -122,7 +122,7 @@ body{font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,'Segoe UI',syst
 /* ── Charts ── */
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1.25rem;margin-bottom:1.25rem}
 .chart-card{background:var(--bg-card);border-radius:var(--radius);padding:1.25rem;border:1px solid var(--border-dim);overflow:hidden;transition:border-color .2s}
-.chart-card:hover{border-color:rgba(255,38,74,0.3)}
+.chart-card:hover{border-color:rgba(255,38,74,0.45);box-shadow:0 0 22px rgba(255,38,74,0.13),0 0 50px rgba(255,38,74,0.06)}
 .chart-card.wide{grid-column:1/-1}
 .chart-subtitle{font-size:.85rem;font-weight:700;color:var(--text-secondary);margin-bottom:.875rem;display:flex;align-items:center;gap:.4rem}
 .chart-subtitle::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent-red);box-shadow:0 0 6px var(--accent-red);flex-shrink:0}
@@ -214,8 +214,10 @@ tr.tot:hover td{background:rgba(255,38,74,0.2)}
 
 /* ── Responsive ── */
 @media(max-width:900px){
-  .donut-layout{grid-template-columns:1fr}
+  .donut-layout{grid-template-columns:1fr;justify-items:center}
+  .donut-layout>div:last-child{width:100%;min-height:280px}
   .pie-pair{grid-template-columns:1fr}
+  .pie-pair>div{min-height:320px}
 }
 @media(max-width:768px){
   body{padding-bottom:60px}
@@ -316,13 +318,46 @@ const COLORS = {
   red:'#ff2646', orange:'#ffb300', green:'#00e676', grey:'#4a5a7a',
 };
 
-// Chart color palettes — warm→cool gradient spectrum
-// PIE_COLORS: fault types (all equal severity) → red→coral→amber→purple→teal
-const PIE_COLORS = ['#ff2646','#ff6640','#e09500','#7055e0','#00a8c8'];
-// Quality maps: semantic — dark navy (neutral) / teal (good) / amber (caution) / red (bad)
-const ONLINE_MAP = {'仍在線數':'#0d1f3d','良品數':'#00b87a','過保數':'#e09500','不良品數':'#ff2646','人為數':'#7055e0'};
-const RETURN_MAP = {'良品數':'#00b87a','過保數':'#e09500','不良品數':'#ff2646','人為數':'#7055e0'};
-const DISPOSAL_MAP = {'良品（再使用）':'#00b87a','不良品（維修/換貨）':'#ff2646','過保/報廢':'#3a4a60'};
+// Chart color palettes — warm tone
+const PIE_COLORS = ['#FF4757','#FF7043','#FFA040','#A55EEA','#26C6DA'];
+const ONLINE_MAP = {'仍在線數':'#1a2a42','良品數':'#2ED573','過保數':'#FFA040','不良品數':'#FF4757','人為數':'#A55EEA'};
+const RETURN_MAP = {'良品數':'#2ED573','過保數':'#FFA040','不良品數':'#FF4757','人為數':'#A55EEA'};
+const DISPOSAL_MAP = {'良品（再使用）':'#2ED573','不良品（維修/換貨）':'#FF4757','過保/報廢':'#FFA040'};
+
+// SVG gradient injection for pie/donut slices
+function applyPieGradients(el) {
+  if (!el) return;
+  const svg = el.querySelector('svg.main-svg');
+  if (!svg) return;
+  const specs = [
+    {base:'#2ed573', id:'pg-good',  c1:'#80FFBB', c2:'#10A040'},
+    {base:'#ff4757', id:'pg-bad',   c1:'#FF8090', c2:'#C00020'},
+    {base:'#ffa040', id:'pg-scrap', c1:'#FFD090', c2:'#C06000'},
+    {base:'#1a2a42', id:'pg-dark',  c1:'#2a3e5a', c2:'#0d1826'},
+    {base:'#a55eea', id:'pg-purp',  c1:'#CC90FF', c2:'#6A20C0'},
+  ];
+  let defs = svg.querySelector('defs');
+  if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.insertBefore(defs, svg.firstChild); }
+  svg.querySelectorAll('linearGradient[data-pg]').forEach(g=>g.remove());
+  specs.forEach(({id,c1,c2}) => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg','linearGradient');
+    g.setAttribute('id',id); g.setAttribute('x1','15%'); g.setAttribute('y1','0%');
+    g.setAttribute('x2','85%'); g.setAttribute('y2','100%');
+    g.setAttribute('gradientUnits','objectBoundingBox'); g.setAttribute('data-pg','1');
+    const s1 = document.createElementNS('http://www.w3.org/2000/svg','stop');
+    s1.setAttribute('offset','0%'); s1.setAttribute('stop-color',c1);
+    const s2 = document.createElementNS('http://www.w3.org/2000/svg','stop');
+    s2.setAttribute('offset','100%'); s2.setAttribute('stop-color',c2);
+    g.append(s1,s2); defs.appendChild(g);
+  });
+  const map = {}; specs.forEach(({base,id}) => { map[base] = id; });
+  el.querySelectorAll('path').forEach(p => {
+    const f = (p.getAttribute('fill')||'').trim().toLowerCase();
+    if (map[f]) { p.setAttribute('fill',`url(#${map[f]})`); return; }
+    const m = p.getAttribute('style')?.match(/fill\s*:\s*(#[0-9a-fA-F]{6})/);
+    if (m && map[m[1].toLowerCase()]) p.style.fill = `url(#${map[m[1].toLowerCase()]})`;
+  });
+}
 
 // ════════════════════════════════════════════════════════
 // STATE
@@ -1109,22 +1144,26 @@ function plotOnlineDonut(chartId, tblId, capId, kc, name) {
   const labels = items.map(i=>i.l);
   const values = items.map(i=>i.v);
   const colors = items.map(i=>ONLINE_MAP[i.l]||COLORS.grey);
-  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?r1(p).toFixed(1)+'%':''; });
+  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=3?r1(p).toFixed(1)+'%':''; });
 
   const el = document.getElementById(chartId);
   if (!el) return;
   Plotly.newPlot(el, [{
     type:'pie', hole:0.55, values, labels,
-    marker:{colors}, text:texts, textinfo:'text',
+    marker:{colors, line:{color:'rgba(255,255,255,0.08)',width:1.5}},
+    text:texts, textinfo:'text',
     textposition:'inside', insidetextorientation:'horizontal',
-    hoverinfo:'label+value+percent', textfont:{size:11},
+    hoverinfo:'label+value+percent', textfont:{size:13,color:'#ffffff'},
   }], {
     height:300, margin:{t:10,b:60,l:10,r:10},
     autosize:true,
     showlegend:true, legend:{orientation:'h',y:-0.12,x:0.5,xanchor:'center',font:{size:10,color:'#c0cfe8'}},
-    annotations:[{text:`上線<br>${fmt(kc.total_on)}`,showarrow:false,font:{size:11,color:'#c0cfe8'},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
+    annotations:[{text:`上線<br>${fmt(kc.total_on)}`,showarrow:false,font:{size:13,color:'#e8eef8'},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
+    hoverlabel:{bgcolor:'rgba(13,21,38,0.95)',bordercolor:'rgba(255,38,74,0.5)',font:{color:'#e8eef8',size:12}},
     plot_bgcolor:'#0d1526', paper_bgcolor:'#0d1526',
   }, {responsive:true, displayModeBar:false});
+  setTimeout(()=>applyPieGradients(el), 60);
+  el.on('plotly_afterplot', ()=>setTimeout(()=>applyPieGradients(el), 30));
 }
 
 function plotReturnDonut(chartId, tblId, capId, kc, name) {
@@ -1141,22 +1180,26 @@ function plotReturnDonut(chartId, tblId, capId, kc, name) {
   const labels = items.map(i=>i.l);
   const values = items.map(i=>i.v);
   const colors = items.map(i=>RETURN_MAP[i.l]||COLORS.grey);
-  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=5?r1(p).toFixed(1)+'%':''; });
+  const texts  = items.map(i=>{ const p=i.v/total*100; return p>=3?r1(p).toFixed(1)+'%':''; });
 
   const el = document.getElementById(chartId);
   if (!el) return;
   Plotly.newPlot(el, [{
     type:'pie', hole:0.55, values, labels,
-    marker:{colors}, text:texts, textinfo:'text',
+    marker:{colors, line:{color:'rgba(255,255,255,0.08)',width:1.5}},
+    text:texts, textinfo:'text',
     textposition:'inside', insidetextorientation:'horizontal',
-    hoverinfo:'label+value+percent', textfont:{size:11},
+    hoverinfo:'label+value+percent', textfont:{size:13,color:'#ffffff'},
   }], {
     height:300, margin:{t:10,b:60,l:10,r:10},
     autosize:true,
     showlegend:true, legend:{orientation:'h',y:-0.12,x:0.5,xanchor:'center',font:{size:10,color:'#c0cfe8'}},
-    annotations:[{text:`回廠<br>${fmt(kc.total_ret)}`,showarrow:false,font:{size:11,color:'#c0cfe8'},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
+    annotations:[{text:`回廠<br>${fmt(kc.total_ret)}`,showarrow:false,font:{size:13,color:'#e8eef8'},x:0.5,y:0.5,xanchor:'center',yanchor:'middle'}],
+    hoverlabel:{bgcolor:'rgba(13,21,38,0.95)',bordercolor:'rgba(255,38,74,0.5)',font:{color:'#e8eef8',size:12}},
     plot_bgcolor:'#0d1526', paper_bgcolor:'#0d1526',
   }, {responsive:true, displayModeBar:false});
+  setTimeout(()=>applyPieGradients(el), 60);
+  el.on('plotly_afterplot', ()=>setTimeout(()=>applyPieGradients(el), 30));
 }
 
 function plotPie(elId, rows, faultCols, title) {
@@ -1196,18 +1239,21 @@ function plotDisposal(elId, kpi, title) {
   Plotly.newPlot(el, [{
     type:'pie', hole:0.45,
     values:items.map(i=>i.v), labels:items.map(i=>i.l),
-    marker:{colors:items.map(i=>DISPOSAL_MAP[i.l])},
-    text:items.map(i=>{ const p=i.v/dTotal*100; return p>=5?r1(p).toFixed(1)+'%':''; }),
+    marker:{colors:items.map(i=>DISPOSAL_MAP[i.l]), line:{color:'rgba(255,255,255,0.08)',width:1.5}},
+    text:items.map(i=>{ const p=i.v/dTotal*100; return p>=3?r1(p).toFixed(1)+'%':''; }),
     textinfo:'text', textposition:'inside', insidetextorientation:'horizontal',
-    hoverinfo:'label+value+percent', textfont:{size:11},
+    hoverinfo:'label+value+percent', textfont:{size:13,color:'#ffffff'},
   }], {
     title:{text:title,font:{size:13,color:'#c0cfe8'}},
     height:360, margin:{t:50,b:80,l:10,r:10},
     autosize:true,
     showlegend:true,
     legend:{orientation:'h',y:-0.18,x:0.5,xanchor:'center',font:{size:10,color:'#c0cfe8'}},
+    hoverlabel:{bgcolor:'rgba(13,21,38,0.95)',bordercolor:'rgba(255,38,74,0.5)',font:{color:'#e8eef8',size:12}},
     plot_bgcolor:'#0d1526', paper_bgcolor:'#0d1526',
   }, {responsive:true, displayModeBar:false});
+  setTimeout(()=>applyPieGradients(el), 60);
+  el.on('plotly_afterplot', ()=>setTimeout(()=>applyPieGradients(el), 30));
 }
 
 function plotVendorTrend(elId, st, cfg) {
@@ -1609,11 +1655,17 @@ function switchTab(tabId) {
     document.getElementById(`tab-${t}`).style.display = t===tabId?'block':'none';
     document.getElementById(`tab-btn-${t}`).classList.toggle('active', t===tabId);
   });
-  // Trigger resize to fix Plotly charts
+  // Trigger resize to fix Plotly charts (two passes: layout settle + gradient re-apply)
   setTimeout(()=>{
     window.dispatchEvent(new Event('resize'));
     document.querySelectorAll('.js-plotly-plot').forEach(el=>Plotly.Plots.resize(el));
   }, 200);
+  setTimeout(()=>{
+    document.querySelectorAll('.js-plotly-plot').forEach(el=>{
+      Plotly.Plots.resize(el);
+      setTimeout(()=>applyPieGradients(el), 50);
+    });
+  }, 600);
 }
 
 function switchRecTab(tabId, type, btn) {

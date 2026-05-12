@@ -318,23 +318,29 @@ const COLORS = {
   red:'#ff2646', orange:'#ffb300', green:'#00e676', grey:'#4a5a7a',
 };
 
-// Chart color palettes — warm tone
-const PIE_COLORS = ['#FF4757','#FF7043','#FFA040','#A55EEA','#26C6DA'];
-const ONLINE_MAP = {'仍在線數':'#1a2a42','良品數':'#2ED573','過保數':'#FFA040','不良品數':'#FF4757','人為數':'#A55EEA'};
-const RETURN_MAP = {'良品數':'#2ED573','過保數':'#FFA040','不良品數':'#FF4757','人為數':'#A55EEA'};
-const DISPOSAL_MAP = {'良品（再使用）':'#2ED573','不良品（維修/換貨）':'#FF4757','過保/報廢':'#FFA040'};
+// Chart color palettes — single warm amber-rust family
+// All base colors are dark enough (contrast ≥ 4.5:1) for white text overlay
+const PIE_COLORS = ['#CC3000','#A05000','#CC6800','#6A1800','#8B3800'];
+const ONLINE_MAP = {'仍在線數':'#1E2840','良品數':'#D4861A','過保數':'#A04A00','不良品數':'#7A1800','人為數':'#B05A00'};
+const RETURN_MAP = {'良品數':'#D4861A','過保數':'#A04A00','不良品數':'#7A1800','人為數':'#B05A00'};
+const DISPOSAL_MAP = {'良品（再使用）':'#D4861A','不良品（維修/換貨）':'#7A1800','過保/報廢':'#A04A00'};
 
-// SVG gradient injection for pie/donut slices
+// SVG gradient injection for pie/donut slices (bright→deep per slice)
 function applyPieGradients(el) {
   if (!el) return;
   const svg = el.querySelector('svg.main-svg');
   if (!svg) return;
   const specs = [
-    {base:'#2ed573', id:'pg-good',  c1:'#80FFBB', c2:'#10A040'},
-    {base:'#ff4757', id:'pg-bad',   c1:'#FF8090', c2:'#C00020'},
-    {base:'#ffa040', id:'pg-scrap', c1:'#FFD090', c2:'#C06000'},
-    {base:'#1a2a42', id:'pg-dark',  c1:'#2a3e5a', c2:'#0d1826'},
-    {base:'#a55eea', id:'pg-purp',  c1:'#CC90FF', c2:'#6A20C0'},
+    {base:'#d4861a', id:'pg-good',  c1:'#F0AC30', c2:'#8C5000'},
+    {base:'#7a1800', id:'pg-bad',   c1:'#C03820', c2:'#3C0400'},
+    {base:'#a04a00', id:'pg-scrap', c1:'#CC6A20', c2:'#602000'},
+    {base:'#1e2840', id:'pg-dark',  c1:'#2E3C58', c2:'#0E1830'},
+    {base:'#b05a00', id:'pg-human', c1:'#D07A20', c2:'#703A00'},
+    {base:'#cc3000', id:'pg-p0',    c1:'#FF5020', c2:'#841000'},
+    {base:'#a05000', id:'pg-p1',    c1:'#CC7030', c2:'#602800'},
+    {base:'#cc6800', id:'pg-p2',    c1:'#F09020', c2:'#884000'},
+    {base:'#6a1800', id:'pg-p3',    c1:'#A04020', c2:'#380400'},
+    {base:'#8b3800', id:'pg-p4',    c1:'#B86030', c2:'#501800'},
   ];
   let defs = svg.querySelector('defs');
   if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.insertBefore(defs, svg.firstChild); }
@@ -1148,8 +1154,10 @@ function plotOnlineDonut(chartId, tblId, capId, kc, name) {
 
   const el = document.getElementById(chartId);
   if (!el) return;
+  el.style.width = '100%';
   Plotly.newPlot(el, [{
     type:'pie', hole:0.55, values, labels,
+    domain:{x:[0.02,0.98]},
     marker:{colors, line:{color:'rgba(255,255,255,0.08)',width:1.5}},
     text:texts, textinfo:'text',
     textposition:'inside', insidetextorientation:'horizontal',
@@ -1184,8 +1192,10 @@ function plotReturnDonut(chartId, tblId, capId, kc, name) {
 
   const el = document.getElementById(chartId);
   if (!el) return;
+  el.style.width = '100%';
   Plotly.newPlot(el, [{
     type:'pie', hole:0.55, values, labels,
+    domain:{x:[0.02,0.98]},
     marker:{colors, line:{color:'rgba(255,255,255,0.08)',width:1.5}},
     text:texts, textinfo:'text',
     textposition:'inside', insidetextorientation:'horizontal',
@@ -1205,30 +1215,36 @@ function plotReturnDonut(chartId, tblId, capId, kc, name) {
 function plotPie(elId, rows, faultCols, title) {
   const el = document.getElementById(elId);
   if (!el) return;
+  el.style.width = '100%';
   const avail = faultCols.filter(c=>rows.some(r=>toN(r[c])>0));
   if (!avail.length || !rows.length) { el.innerHTML='<div style="color:#c0cfe8;font-size:.85rem;padding:1rem;text-align:center">無資料</div>'; return; }
   const totals = avail.map(c=>({l:c,v:rows.reduce((s,r)=>s+toN(r[c]),0)})).filter(i=>i.v>0);
   const total = totals.reduce((s,i)=>s+i.v,0)||1;
   Plotly.newPlot(el, [{
     type:'pie', hole:0.45,
+    domain:{x:[0.02,0.98]},
     values:totals.map(i=>i.v), labels:totals.map(i=>i.l),
-    marker:{colors:PIE_COLORS},
-    text:totals.map(i=>{ const p=i.v/total*100; return p>=5?r1(p).toFixed(1)+'%':''; }),
+    marker:{colors:PIE_COLORS, line:{color:'rgba(255,255,255,0.08)',width:1.5}},
+    text:totals.map(i=>{ const p=i.v/total*100; return p>=3?r1(p).toFixed(1)+'%':''; }),
     textinfo:'text', textposition:'inside', insidetextorientation:'horizontal',
-    hoverinfo:'label+value+percent', textfont:{size:11},
+    hoverinfo:'label+value+percent', textfont:{size:13,color:'#ffffff'},
   }], {
     title:{text:title,font:{size:13,color:'#c0cfe8'}},
     height:360, margin:{t:50,b:80,l:10,r:10},
     autosize:true,
     showlegend:true,
     legend:{orientation:'h',y:-0.18,x:0.5,xanchor:'center',font:{size:10,color:'#c0cfe8'}},
+    hoverlabel:{bgcolor:'rgba(13,21,38,0.95)',bordercolor:'rgba(255,38,74,0.5)',font:{color:'#e8eef8',size:12}},
     plot_bgcolor:'#0d1526', paper_bgcolor:'#0d1526',
   }, {responsive:true, displayModeBar:false});
+  setTimeout(()=>applyPieGradients(el), 60);
+  el.on('plotly_afterplot', ()=>setTimeout(()=>applyPieGradients(el), 30));
 }
 
 function plotDisposal(elId, kpi, title) {
   const el = document.getElementById(elId);
   if (!el) return;
+  el.style.width = '100%';
   const items = [
     {l:'良品（再使用）',v:kpi.total_good},
     {l:'不良品（維修/換貨）',v:kpi.total_bad},
@@ -1238,6 +1254,7 @@ function plotDisposal(elId, kpi, title) {
   const dTotal = items.reduce((s,i)=>s+i.v,0)||1;
   Plotly.newPlot(el, [{
     type:'pie', hole:0.45,
+    domain:{x:[0.02,0.98]},
     values:items.map(i=>i.v), labels:items.map(i=>i.l),
     marker:{colors:items.map(i=>DISPOSAL_MAP[i.l]), line:{color:'rgba(255,255,255,0.08)',width:1.5}},
     text:items.map(i=>{ const p=i.v/dTotal*100; return p>=3?r1(p).toFixed(1)+'%':''; }),
@@ -1655,17 +1672,19 @@ function switchTab(tabId) {
     document.getElementById(`tab-${t}`).style.display = t===tabId?'block':'none';
     document.getElementById(`tab-btn-${t}`).classList.toggle('active', t===tabId);
   });
-  // Trigger resize to fix Plotly charts (two passes: layout settle + gradient re-apply)
-  setTimeout(()=>{
-    window.dispatchEvent(new Event('resize'));
-    document.querySelectorAll('.js-plotly-plot').forEach(el=>Plotly.Plots.resize(el));
-  }, 200);
+  // Three-pass resize: ensures charts that rendered while hidden get correct dimensions
+  setTimeout(()=>{ window.dispatchEvent(new Event('resize')); }, 50);
   setTimeout(()=>{
     document.querySelectorAll('.js-plotly-plot').forEach(el=>{
-      Plotly.Plots.resize(el);
-      setTimeout(()=>applyPieGradients(el), 50);
+      Plotly.relayout(el, {autosize:true});
     });
-  }, 600);
+  }, 250);
+  setTimeout(()=>{
+    document.querySelectorAll('.js-plotly-plot').forEach(el=>{
+      Plotly.relayout(el, {autosize:true});
+      setTimeout(()=>applyPieGradients(el), 60);
+    });
+  }, 650);
 }
 
 function switchRecTab(tabId, type, btn) {

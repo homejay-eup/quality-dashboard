@@ -145,7 +145,7 @@ body{font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,'Segoe UI',syst
 .toggle-lbl input{accent-color:var(--accent-red)}
 .tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border-dim);background:var(--bg-card);max-height:600px;overflow-y:auto}
 table{width:100%;border-collapse:collapse;font-size:.82rem}
-thead{background:rgba(107,58,31,0.05);position:sticky;top:0;z-index:1}
+thead{background:var(--bg-card);position:sticky;top:0;z-index:1;box-shadow:0 1px 0 var(--border-dim)}
 th{padding:.65rem .875rem;text-align:right;font-weight:700;color:var(--text-secondary);font-size:.7rem;border-bottom:1px solid var(--border-dim);white-space:nowrap;letter-spacing:.04em;text-transform:uppercase}
 th.l{text-align:left}
 td{padding:.55rem .875rem;text-align:right;color:var(--text-primary);border-bottom:1px solid rgba(107,58,31,0.06);white-space:nowrap}
@@ -1672,7 +1672,7 @@ function switchTab(tabId) {
     document.getElementById(`tab-${t}`).style.display = t===tabId?'block':'none';
     document.getElementById(`tab-btn-${t}`).classList.toggle('active', t===tabId);
   });
-  // Three-pass resize: ensures charts that rendered while hidden get correct dimensions
+  // Multi-pass resize: ensures charts that rendered while hidden get correct dimensions
   setTimeout(()=>{ window.dispatchEvent(new Event('resize')); }, 50);
   setTimeout(()=>{
     document.querySelectorAll('.js-plotly-plot').forEach(el=>{
@@ -1685,6 +1685,14 @@ function switchTab(tabId) {
       setTimeout(()=>applyPieGradients(el), 60);
     });
   }, 650);
+  // 4th pass: targeted at active-tab only — handles charts that were 0-width at render time
+  setTimeout(()=>{
+    document.getElementById(`tab-${tabId}`).querySelectorAll('.js-plotly-plot').forEach(el=>{
+      el.style.width = '100%';
+      Plotly.relayout(el, {autosize:true});
+      setTimeout(()=>applyPieGradients(el), 60);
+    });
+  }, 1200);
 }
 
 function switchRecTab(tabId, type, btn) {
